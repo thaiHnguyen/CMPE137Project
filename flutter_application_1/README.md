@@ -5,7 +5,7 @@ A new Flutter project.
 ## Members
 - Thai Nguyen | Email: thai.nguyen02@sjsu.edu
 
--
+- Jan Michael Maturan | Email: janmichael.maturan@sjsu.edu
 
 
 ## Getting Started
