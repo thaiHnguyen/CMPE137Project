@@ -7,7 +7,7 @@ A new Flutter project.
 
 - Jan Michael Maturan | Email: janmichael.maturan@sjsu.edu
 
-## Server setup
+## Server setup (can also be found in server/README.md)
 
 1. Install the CLI:
 ```
