@@ -7,18 +7,31 @@ A new Flutter project.
 
 - Jan Michael Maturan | Email: janmichael.maturan@sjsu.edu
 
+## Server setup
 
-## Getting Started
+1. Install the CLI:
+```
+   dart pub global activate dart_frog_cli
+```
+   If `dart_frog` isn't recognized afterward, add
+   `%LOCALAPPDATA%\Pub\Cache\bin` to your User PATH (Environment Variables -> User Variable -> Path) and open a new terminal.
 
-This project is a starting point for a Flutter application.
+2. Install dependencies:
+```
+   cd server
+   dart pub get
+```
 
-A few resources to get you started if this is your first Flutter project:
+3. Create `server/.env` by copying `.env.example`, then fill in:
+```
+   TMDB_API_KEY=
+   DB_PASSWORD=
+```
+   Ask Thai via discord for the TMDB key, it is not in the repo (for security purpose)
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+4. Run from inside `server/`:
+```
+   dart_frog dev
+```
+   Serves on http://localhost:8080
 
