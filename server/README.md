@@ -1,5 +1,3 @@
-## Server setup
-
 # server
 
 [![style: dart frog lint][dart_frog_lint_badge]][dart_frog_lint_link]
@@ -55,13 +53,13 @@ Then fill in the blanks:
 DB_HOST=localhost
 DB_PORT=3306
 DB_NAME=noireel
-DB_USER=your_root_user_name_MySQL
+DB_USER=root
 DB_PASSWORD=your_mysql_root_password
-TMDB_API_KEY=
+TMDB_API_KEY=ask_thai
 ```
 
 - `DB_PASSWORD` is **your own** MySQL root password (the one you use to log into Workbench).
-- `TMDB_API_KEY`: ask me on Discord. It is not in the repo for security reasons.
+- `TMDB_API_KEY`: ask Thai on Discord. It is not in the repo for security reasons.
 - Format: one `KEY=value` per line, no spaces around `=`, no quotes.
 
 > **Before typing any real values, make sure git ignores `.env`:**
