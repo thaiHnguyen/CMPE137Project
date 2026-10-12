@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  debugPrint('ENV loaded: ${dotenv.env.keys}'); // temporary check - remove once confirmed
   runApp(const MyApp());
 }
 
