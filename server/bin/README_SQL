@@ -1,0 +1,118 @@
+# NoiReel database setup (MySQL Workbench)
+
+This sets up the `noireel` database on your machine and fills it with movies and TV shows from TMDB. Do the steps in order. It takes about 15 minutes.
+
+Files involved (all inside `server/`):
+
+- `db/schema.sql`: Creates all 29 tables 
+- `bin/import_tmdb.dart`: Downloads popular titles, genres and cast from TMDB into the tables 
+- `.env`: Your MySQL password and the TMDB key (never committed these) 
+
+---
+
+## 1. Install MySQL Server and Workbench
+
+Skip this if you already have both.
+
+1. Download the **MySQL Installer for Windows** from https://dev.mysql.com/downloads/installer/ (the larger "full" download is easiest).
+2. Choose **Custom** and add **MySQL Server 8.x** and **MySQL Workbench 8.0**.
+3. When asked for a **root password**, pick one and write it down. You need it.
+4. Leave the port as **3306** and let MySQL run as a Windows service.
+
+## 2. Connect in Workbench
+
+1. Open MySQL Workbench.
+2. Under **MySQL Connections**, click the local connection (usually "Local instance MySQL80").
+3. Enter your root password. If it opens a query tab, you're connected.
+
+## 3. Create the database and tables
+
+1. In the query tab, run:
+   ```sql
+   CREATE DATABASE noireel;
+   ```
+   (Click the lightning-bolt button to run.)
+
+2. In the **Schemas** panel on the left, click refresh. `noireel` appears.
+3. **Double-click `noireel`** so it turns bold. This makes it the default database. If you skip this, the next step fails with "No database selected".
+4. **File → Open SQL Script** → choose `server/db/schema.sql` → click the lightning bolt.
+5. Refresh the Schemas panel and expand `noireel` → **Tables**. You should see **29 tables**.
+
+> Re-running `schema.sql` deletes every table and recreates it, so any data is wiped. That's fine during development; just run the importer again afterward.
+
+## 4. Create `server/.env`
+
+From inside `server/`:
+
+```
+copy .env.example .env      # Windows cmd / PowerShell
+cp .env.example .env        # Git Bash
+```
+
+Fill it in (one `KEY=value` per line, no spaces, no quotes):
+
+```
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=noireel
+DB_USER=root
+DB_PASSWORD=your_mysql_root_password
+TMDB_API_KEY=ask_thai
+```
+
+- `DB_PASSWORD` is the root password from step 1.
+- `TMDB_API_KEY`: ask Thai on Discord. It is not in the repo.
+- Check `.env` is ignored before saving real values: `git check-ignore .env` must print `.env`. If it prints nothing, stop and tell Thai.
+
+## 5. Import movies and TV shows
+
+From inside `server/`:
+
+```
+dart pub get
+dart run bin/import_tmdb.dart --pages 3
+```
+
+You should see something like:
+
+```
+Genres: 27 TMDB genre ids mapped
+movie: 58 popular titles to import
+...
+movie: 58 imported, 0 skipped
+tv: 60 popular titles to import
+...
+tv: 60 imported, 0 skipped
+```
+
+`--pages 3` is a quick test (~60 movies + ~60 shows). For the full catalog, run it without the flag (~200 of each):
+
+```
+dart run bin/import_tmdb.dart
+```
+
+The importer is safe to run as many times as you like. It updates existing titles instead of duplicating them.
+
+## 6. Check the data
+
+In Workbench (with `noireel` still bold):
+
+```sql
+SELECT type, COUNT(*) FROM titles GROUP BY type;
+
+SELECT t.name, t.release_year, g.name AS genre
+FROM titles t
+JOIN title_genres tg USING (title_id)
+JOIN genres g USING (genre_id)
+LIMIT 20;
+```
+
+The first query shows how many movies and shows you have; the second lists titles with their genres.
+
+---
+
+## Notes about the design
+
+- **Users:** `user_accounts` holds the login for everyone. `registered_users` and `admins` add the extra fields for each role and share the same `user_id`.
+- **Catalog:** `titles`, `genres`, `people` and `title_credits` are a local copy of TMDB data, matched on TMDB ids.
+- **Some rules live in server code, not the database:** watch dates can't be in the future, each user has one undeletable default watchlist, each report targets exactly one review or watchlist, and stored averages/counts must be updated in the same transaction as the change. These are listed at the top of `schema.sql`.
