@@ -23,7 +23,6 @@
 
 -- * No image table: uploaded images are never stored (SYS-03.04).
 -- * Guest themes live in device storage, not here (GU-06.03).
--- =====================================================================
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -37,9 +36,7 @@ DROP TABLE IF EXISTS engagement_events, moderation_actions, reports,
 
 SET FOREIGN_KEY_CHECKS = 1;
 
--- ---------------------------------------------------------------------
 -- Accounts (ERD: UserAccount ISA RegisteredUser | Admin)
--- ---------------------------------------------------------------------
 
 CREATE TABLE user_accounts (
   user_id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -119,10 +116,8 @@ CREATE TABLE password_resets (
     REFERENCES user_accounts (user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---------------------------------------------------------------------
--- Catalog (local copy of TMDB data; admins can add/edit, AD-06, SYS-04)
--- ---------------------------------------------------------------------
 
+-- Catalog (local copy of TMDB data; admins can add/edit, AD-06, SYS-04)
 CREATE TABLE titles (
   title_id     BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   tmdb_id      INT UNSIGNED NULL,                    -- NULL for admin-created entries
@@ -262,10 +257,7 @@ CREATE TABLE private_tags (
   CONSTRAINT fk_pt_title FOREIGN KEY (title_id) REFERENCES titles (title_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---------------------------------------------------------------------
 -- Social: ratings, reviews, watchlists, logs
--- ---------------------------------------------------------------------
-
 CREATE TABLE ratings (
   rating_id  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   user_id    BIGINT UNSIGNED NOT NULL,
@@ -342,10 +334,7 @@ CREATE TABLE watch_logs (
   CONSTRAINT fk_log_title FOREIGN KEY (title_id) REFERENCES titles (title_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---------------------------------------------------------------------
 -- Recommendation inputs (RU-04, SYS-01, SYS-02)
--- ---------------------------------------------------------------------
-
 CREATE TABLE not_interested (
   user_id    BIGINT UNSIGNED NOT NULL,
   title_id   BIGINT UNSIGNED NOT NULL,
@@ -391,10 +380,7 @@ CREATE TABLE engagement_events (
   CONSTRAINT fk_ev_mood  FOREIGN KEY (mood_id)  REFERENCES moods (mood_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---------------------------------------------------------------------
 -- Admin: curation, reports, moderation log
--- ---------------------------------------------------------------------
-
 CREATE TABLE collections (
   collection_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   created_by    BIGINT UNSIGNED NULL,
