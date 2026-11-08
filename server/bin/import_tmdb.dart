@@ -139,14 +139,17 @@ List<Map<String, dynamic>> _objects(Object? v) =>
     (v as List?)?.cast<Map<String, dynamic>>() ?? const [];
 
 String? _clip(String? s, int max) =>
-    (s == null || s.isEmpty) ? null : (s.length <= max ? s : s.substring(0, max));
+    (s == null || s.isEmpty) ? null : 
+        (s.length <= max ? s : s.substring(0, max));
 
 /// Fetches one title's details + credits and writes it in one transaction.
-Future<void> _importTitle(String type, int tmdbId, Map<int, int> genreIds) async {
+Future<void> _importTitle(String type, int tmdbId, 
+                          Map<int, int> genreIds) async {
   final d = await _get('/$type/$tmdbId', {'append_to_response': 'credits'});
   final isTv = type == 'tv';
 
-  final episodeTimes = (d['episode_run_time'] as List?)?.cast<int>() ?? const <int>[];
+  final episodeTimes = (d['episode_run_time'] as List?)?.cast<int>() ?? 
+                          const <int>[];
   final runtime = isTv
       ? _positive(episodeTimes.isEmpty ? null : episodeTimes.first)
       : _positive(d['runtime']);
@@ -154,7 +157,8 @@ Future<void> _importTitle(String type, int tmdbId, Map<int, int> genreIds) async
 
   // Directors (movies) / creators (TV), then the top-billed cast.
   final creditsJson = (d['credits'] as Map<String, dynamic>?) ?? const {};
-  final credits = <({int tmdbId, String name, String role, String? character, int? order})>[];
+  final credits = <({int tmdbId, String name, String role, 
+                      String? character, int? order})>[];
   if (isTv) {
     for (final c in _objects(d['created_by'])) {
       credits.add((tmdbId: c['id'] as int, name: c['name'] as String,
