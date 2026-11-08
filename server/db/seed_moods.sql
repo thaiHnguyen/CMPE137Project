@@ -7,7 +7,7 @@
 -- Genres are matched on TMDB genre ids, which never change, so renaming a
 -- genre in the database won't break this file.
 -- =====================================================================
-
+SET SQL_SAFE_UPDATES = 0;
 -- Moods (3 opposing pairs)
 INSERT INTO moods (name, description, color_hex) VALUES
   ('Hopeful',    'Optimistic, inspiring, things will work out', '#D9B13B'),
@@ -90,3 +90,4 @@ SELECT m.name AS mood, COUNT(*) AS titles
 FROM title_moods tm JOIN moods m USING (mood_id)
 WHERE tm.genre_score > 0
 GROUP BY m.name ORDER BY titles DESC;
+SET SQL_SAFE_UPDATES = 1;
