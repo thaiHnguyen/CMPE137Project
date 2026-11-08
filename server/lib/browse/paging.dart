@@ -1,8 +1,8 @@
 import 'package:dart_frog/dart_frog.dart';
 
-/// Which page of a list to return
+/// Which page of a list to return, read from `?page=` and `?limit=`.
 class Paging {
-  /// Creates a [Paging].
+  /// Creates a [Paging]
   const Paging(this.page, this.limit);
 
   /// Page number, starting at 1
@@ -42,7 +42,7 @@ int? _positiveInt(String value) {
   return int.tryParse(value);
 }
 
-/// 400 response for a bad `?page=` or `?limit=`.
+/// 400 response for a bad `?page=` or `?limit=`
 Response invalidPaging() => Response.json(
       statusCode: 400,
       body: {

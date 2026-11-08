@@ -27,7 +27,7 @@ LEFT JOIN moods c ON c.mood_id = mc.counter_mood_id AND c.is_active
 WHERE m.is_active AND m.mood_id = :id
 GROUP BY m.mood_id''';
 
-  /// RU-05.01: every active mood.
+  /// RU-05.01: every active mood
   Future<List<Mood>> listActive() async {
     final res = await _db.execute(_listMoods);
     return res.rows.map(Mood.fromRow).toList();

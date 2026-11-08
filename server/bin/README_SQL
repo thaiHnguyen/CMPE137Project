@@ -5,7 +5,8 @@ This sets up the `noireel` database on your machine and fills it with movies and
 Files involved (all inside `server/`):
 
 - `db/schema.sql`: Creates all 29 tables 
-- `bin/import_tmdb.dart`: Downloads popular titles, genres and cast from TMDB into the tables 
+- `bin/import_tmdb.dart`: Downloads titles, genres and cast from TMDB into the tables 
+- `db/seed_moods.sql`: Adds the 6 moods and maps each genre to its moods
 - `.env`: Your MySQL password and the TMDB key (never committed these) 
 
 ---
@@ -70,28 +71,39 @@ From inside `server/`:
 
 ```
 dart pub get
-dart run bin/import_tmdb.dart --pages 3
+dart run bin/import_tmdb.dart --pages 1
 ```
 
 You should see something like:
 
 ```
 Genres: 27 TMDB genre ids mapped
-movie: 58 popular titles to import
+movie: 380 titles to import
+  25/380
 ...
-movie: 58 imported, 0 skipped
-tv: 60 popular titles to import
+movie: 380 imported, 0 skipped
+tv: 300 titles to import
 ...
-tv: 60 imported, 0 skipped
+tv: 300 imported, 0 skipped
+Mood fit: 0 titles have a starting mood
+  Run db/seed_moods.sql once, then this is automatic.
 ```
 
-`--pages 3` is a quick test (~60 movies + ~60 shows). For the full catalog, run it without the flag (~200 of each):
+Your counts will differ. `--pages 1` is a quick test and takes a few minutes. For the full catalog, run it without the flag (3 pages per list, about 15 minutes):
 
 ```
 dart run bin/import_tmdb.dart
 ```
 
-The importer is safe to run as many times as you like. It updates existing titles instead of duplicating them.
+For both movies and TV, the importer pulls the best-rated titles in every genre (at least 300 TMDB votes for movies, 200 for TV), TMDB's all-time top rated list, and one page of what's popular right now. NoiReel ranks by mood, not by what's trending, so the catalog needs depth in every mood across decades. Mood rows are still sorted by mood fit; the TMDB rating only breaks ties.
+
+The importer is safe to run as many times as you like. It updates existing titles instead of duplicating them, and never touches ratings, reviews or mood votes.
+
+## 5b. Add the moods (first time only)
+
+In Workbench, open and run `db/seed_moods.sql`. It needs the genres from step 5, so run it after the first import. The last query should list each mood with a title count.
+
+After this, every import refreshes the moods by itself. You only need to run `seed_moods.sql` again if you change the moods or the genre mappings.
 
 ## 6. Check the data
 

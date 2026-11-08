@@ -25,19 +25,19 @@ FROM title_moods tm
 JOIN titles t ON t.title_id = tm.title_id
 WHERE tm.mood_id = :mood AND tm.mood_score > 0
   AND (tm.is_confirmed OR tm.is_curated
-       OR t.tmdb_vote_count = 0 OR t.tmdb_vote_count >= 200)''';
+        OR t.tmdb_vote_count = 0 OR t.tmdb_vote_count >= 200)''';
 
   // Mood fit decides the order. TMDB rating, then popularity, only break ties
   static const _moodRowTitles = '''
 SELECT t.title_id, t.type, t.name, t.release_year, t.poster_url
 $_moodRowFrom
 ORDER BY tm.mood_score DESC, t.tmdb_vote_avg DESC, t.popularity DESC,
-         t.title_id
+          t.title_id
 LIMIT :limit OFFSET :offset''';
 
   static const _moodRowCount = 'SELECT COUNT(*) AS total $_moodRowFrom';
 
-  /// GU-01: titles for a mood row, best mood fit first
+  /// GU-01: titles for a mood row, best mood fit first.
   Future<TitlePage> titlesForMood(int moodId, Paging paging) async {
     final count = await _db.execute(_moodRowCount, {'mood': moodId});
     final res = await _db.execute(_moodRowTitles, {
@@ -53,7 +53,7 @@ LIMIT :limit OFFSET :offset''';
 
   static const _title = '''
 SELECT title_id, type, name, synopsis, release_year, runtime_min, num_seasons,
-       num_episodes, poster_url, avg_rating, rating_count, mood_voter_count
+        num_episodes, poster_url, avg_rating, rating_count, mood_voter_count
 FROM titles WHERE title_id = :id''';
 
   static const _genres = '''
@@ -62,7 +62,7 @@ FROM title_genres tg JOIN genres g ON g.genre_id = tg.genre_id
 WHERE tg.title_id = :id
 ORDER BY g.name''';
 
-  // `role` is an ENUM, so it sorts as director, creator, cast
+  // `role` is an ENUM, so it sorts as director, creator, cast.
   static const _credits = '''
 SELECT p.person_id, p.name, c.role, c.character_name
 FROM title_credits c JOIN people p ON p.person_id = c.person_id
@@ -112,12 +112,12 @@ ORDER BY votes DESC, mood_id''';
   static const _searchFrom = '''
 FROM titles t
 WHERE t.name LIKE :contains
-   OR EXISTS (SELECT 1
+    OR EXISTS (SELECT 1
               FROM title_credits c JOIN people p ON p.person_id = c.person_id
               WHERE c.title_id = t.title_id AND p.name LIKE :contains)''';
 
   // Exact title, then title starts with it, then title contains it, then a
-  // match on a person's name. Popularity only breaks ties
+  // match on a person's name. Popularity only breaks ties.
   static const _searchTitles = '''
 SELECT t.title_id, t.type, t.name, t.release_year, t.poster_url
 $_searchFrom
@@ -125,12 +125,12 @@ ORDER BY CASE WHEN t.name = :exact THEN 0
               WHEN t.name LIKE :prefix THEN 1
               WHEN t.name LIKE :contains THEN 2
               ELSE 3 END,
-         t.popularity DESC, t.title_id
+          t.popularity DESC, t.title_id
 LIMIT :limit OFFSET :offset''';
 
   static const _searchCount = 'SELECT COUNT(*) AS total $_searchFrom';
 
-  /// GU-02.02: titles whose name, director/creator or cast match [keyword].
+  /// GU-02.02: titles whose name, director/creator or cast match [keyword]
   Future<TitlePage> search(String keyword, Paging paging) async {
     final like = escapeLike(keyword);
     final count = await _db.execute(_searchCount, {'contains': '%$like%'});

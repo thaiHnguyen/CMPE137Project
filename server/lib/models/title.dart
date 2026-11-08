@@ -1,9 +1,9 @@
 import 'package:mysql_client/mysql_client.dart';
 import 'package:server/models/mood.dart';
 
-/// A title as shown in a mood row or search result (GU-01.04, GU-02.03).
+/// A title as shown in a mood row or search result (GU-01.04, GU-02.03)
 class TitleCard {
-  /// Builds a [TitleCard] from a row selected by `TitleDao`.
+  /// Builds a [TitleCard] from a row selected by `TitleDao`
   TitleCard.fromRow(ResultSetRow row)
       : id = int.parse(row.colByName('title_id')!),
         type = row.colByName('type')!,
@@ -11,22 +11,22 @@ class TitleCard {
         year = _int(row.colByName('release_year')),
         posterUrl = row.colByName('poster_url');
 
-  /// `titles.title_id`.
+  /// `titles.title_id`
   final int id;
 
-  /// `movie` or `tv`.
+  /// `movie` or `tv`
   final String type;
 
-  /// Title name.
+  /// Title name
   final String name;
 
-  /// Release year, if known.
+  /// Release year, if known
   final int? year;
 
-  /// Poster image. Null means the app shows a placeholder.
+  /// Poster image. Null means the app shows a placeholder
   final String? posterUrl;
 
-  /// JSON sent to the app.
+  /// JSON sent to the app
   Map<String, dynamic> toJson() => {
         'titleId': id,
         'type': type,
@@ -39,22 +39,22 @@ class TitleCard {
 /// One page of titles, plus how many there are in total.
 typedef TitlePage = ({List<TitleCard> titles, int total});
 
-/// A person credited on a title.
+/// A person credited on a title
 class Credit {
-  /// Builds a [Credit] from a row selected by `TitleDao`.
+  /// Builds a [Credit] from a row selected by `TitleDao`
   Credit.fromRow(ResultSetRow row)
       : personId = int.parse(row.colByName('person_id')!),
         name = row.colByName('name')!,
         role = row.colByName('role')!,
         character = row.colByName('character_name');
 
-  /// `people.person_id`.
+  /// `people.person_id`
   final int personId;
 
-  /// Person's name.
+  /// Person's name
   final String name;
 
-  /// `director`, `creator` or `cast`.
+  /// `director`, `creator` or `cast`
   final String role;
 
   /// Character played. Cast only.
@@ -63,14 +63,14 @@ class Credit {
   /// JSON for a director or creator.
   Map<String, dynamic> toJson() => {'personId': personId, 'name': name};
 
-  /// JSON for a cast member.
+  /// JSON for a cast member
   Map<String, dynamic> toCastJson() => {...toJson(), 'character': character};
 }
 
-/// Everything on the title details page (GU-03).
-/// Empty fields are null or empty so the app can hide them (GU-03.04).
+/// Everything on the title details page (GU-03)
+/// Empty fields are null or empty so the app can hide them (GU-03.04)
 class TitleDetails {
-  /// Builds [TitleDetails] from a `titles` row and its related rows.
+  /// Builds [TitleDetails] from a `titles` row and its related rows
   TitleDetails.fromRow(
     ResultSetRow row, {
     required this.genres,
