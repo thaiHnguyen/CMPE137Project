@@ -1,68 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+import 'api/api_client.dart';
+import 'screens/home_screen.dart';
+import 'theme/noireel_theme.dart';
+import 'theme/theme_controller.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
-  runApp(const MyApp());
+  await dotenv.load(fileName: '.env');
+  final themes = await ThemeController.load();
+  runApp(NoiReelApp(themes: themes, api: ApiClient()));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// The NoiReel app. Rebuilds with new colors whenever the theme changes
+class NoiReelApp extends StatelessWidget {
+  /// Creates the app
+  const NoiReelApp({super.key, required this.themes, required this.api});
+
+  /// The current theme
+  final ThemeController themes;
+
+  /// Connection to the NoiReel server
+  final ApiClient api;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'NoiReel',
-      theme: ThemeData(
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'NoiReel'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+    return ValueListenableBuilder<NoiReelPalette>(
+      valueListenable: themes,
+      builder: (context, palette, _) => MaterialApp(
+        title: 'NoiReel',
+        debugShowCheckedModeBanner: false,
+        theme: palette.toThemeData(),
+        home: HomeScreen(api: api, themes: themes),
       ),
     );
   }
