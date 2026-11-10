@@ -5,6 +5,7 @@ import '../api/models.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/mood_row.dart';
 import '../widgets/theme_picker.dart';
+import 'title_details_screen.dart';
 
 /// The home page: the mood/theme picker, then one row per mood (GU-01)
 class HomeScreen extends StatefulWidget {
@@ -76,8 +77,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       key: ValueKey('${mood.id}-$_reloads'),
                       mood: mood,
                       api: widget.api,
-                      onTitleTap: (title) =>
-                          _comingSoon('The details page for ${title.name}'),
+                      onTitleTap: (title) => Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              TitleDetailsScreen(api: widget.api, title: title),
+                        ),
+                      ),
                     ),
               ],
             );
