@@ -29,25 +29,7 @@ class PosterCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: AspectRatio(
-                aspectRatio: 2 / 3,
-                child: url == null
-                    ? _Placeholder(type: title.type)
-                    : Image.network(
-                        url,
-                        fit: BoxFit.cover,
-                        // Show the placeholder while loading or if it fails.
-                        loadingBuilder: (context, child, progress) =>
-                            progress == null
-                            ? child
-                            : _Placeholder(type: title.type),
-                        errorBuilder: (context, error, stack) =>
-                            _Placeholder(type: title.type),
-                      ),
-              ),
-            ),
+            PosterImage(url: url, type: title.type),
             const SizedBox(height: 6),
             Text(
               title.name,
@@ -59,6 +41,38 @@ class PosterCard extends StatelessWidget {
               Text('${title.year}', style: text.bodySmall),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A rounded 2:3 poster. Shows a movie or TV placeholder while it
+/// loads, if it fails, or if there's no poster (GU-02.03)
+class PosterImage extends StatelessWidget {
+  /// Creates a [PosterImage]
+  const PosterImage({super.key, required this.url, required this.type});
+
+  final String? url; // Poster image, or null for the placeholder
+  final String type; // `movie` or `tv`, picks the placeholder icon
+
+  @override
+  Widget build(BuildContext context) {
+    final url = this.url;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: AspectRatio(
+        aspectRatio: 2 / 3,
+        child: url == null
+            ? _Placeholder(type: type)
+            : Image.network(
+                url,
+                fit: BoxFit.cover,
+                // Show the placeholder while loading or if it fails
+                loadingBuilder: (context, child, progress) =>
+                    progress == null ? child : _Placeholder(type: type),
+                errorBuilder: (context, error, stack) =>
+                    _Placeholder(type: type),
+              ),
       ),
     );
   }
