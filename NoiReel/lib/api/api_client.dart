@@ -10,11 +10,8 @@ class ApiException implements Exception {
   /// Creates an [ApiException].
   ApiException(this.message, {this.statusCode});
 
-  /// Message that can be shown to the user
-  final String message;
-
-  /// HTTP status, if the server answered at all
-  final int? statusCode;
+  final String message;         // Message that can be shown to the user
+  final int? statusCode;        // HTTP status, if the server answered at all
 
   @override
   String toString() => message;
@@ -53,6 +50,12 @@ class ApiClient {
       'limit': '$limit',
     });
     return TitlePage.fromJson(json);
+  }
+
+  /// `GET /titles/:id`: everything for the title details page
+  Future<TitleDetails> getTitle(int titleId) async {
+    final json = await _get('/titles/$titleId');
+    return TitleDetails.fromJson(json);
   }
 
   Future<Map<String, dynamic>> _get(
