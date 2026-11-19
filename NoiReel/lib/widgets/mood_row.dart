@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../api/models.dart';
+import 'fade_slide_in.dart';
 import 'poster_card.dart';
 
 /// One mood row on the home page: the mood's name, then a sideways list
@@ -60,28 +61,39 @@ class _MoodRowState extends State<MoodRow> {
                 return const Center(child: CircularProgressIndicator());
               }
               if (snapshot.hasError) {
-                return _Message(
-                  text: '${snapshot.error}',
-                  action: ElevatedButton(
-                    onPressed: _retry,
-                    child: const Text('Try again'),
+                return FadeSlideIn(
+                  child: _Message(
+                    text: '${snapshot.error}',
+                    action: ElevatedButton(
+                      onPressed: _retry,
+                      child: const Text('Try again'),
+                    ),
                   ),
                 );
               }
               final titles = snapshot.data!.titles;
               if (titles.isEmpty) {
-                return const _Message(text: 'No titles for this mood yet.');
+                return const FadeSlideIn(
+                  child: _Message(text: 'No titles for this mood yet.'),
+                );
               }
               return ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: titles.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 12),
-                itemBuilder: (context, i) => PosterCard(
-                  title: titles[i],
-                  onTap: widget.onTitleTap == null
-                      ? null
-                      : () => widget.onTitleTap!(titles[i]),
+                itemBuilder: (context, i) => FadeSlideIn.staggered(
+                  // Only the first screenful staggers; posters scrolled
+                  // into view later ease in right away
+                  index: i < 10 ? i : 0,
+                  step: const Duration(milliseconds: 40),
+                  distance: 16,
+                  child: PosterCard(
+                    title: titles[i],
+                    onTap: widget.onTitleTap == null
+                        ? null
+                        : () => widget.onTitleTap!(titles[i]),
+                  ),
                 ),
               );
             },

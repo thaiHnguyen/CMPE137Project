@@ -146,9 +146,15 @@ class NoiReelPalette {
   static NoiReelPalette byName(String? name) =>
       all.firstWhere((p) => p.name == name, orElse: () => defaultTheme);
 
+  // Each theme is built once and reused: building one from scratch
+  // (ColorScheme.fromSeed in particular) is slow enough to notice
+  static final _built = <String, ThemeData>{};
+
   /// Builds the Flutter theme, so standard widgets (buttons, dialogs,
   /// text, the app bar) pick up these colors automatically
-  ThemeData toThemeData() {
+  ThemeData toThemeData() => _built[name] ??= _buildThemeData();
+
+  ThemeData _buildThemeData() {
     final brightness = isDark ? Brightness.dark : Brightness.light;
     final scheme =
         ColorScheme.fromSeed(
@@ -194,6 +200,14 @@ class NoiReelPalette {
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
+      // Every page that opens (e.g. a title's details) fades in while
+      // sliding up, on every platform
+      pageTransitionsTheme: PageTransitionsTheme(
+        builders: {
+          for (final platform in TargetPlatform.values)
+            platform: const FadeUpwardsPageTransitionsBuilder(),
+        },
+      ),
       colorScheme: scheme,
       scaffoldBackgroundColor: background,
       appBarTheme: AppBarTheme(

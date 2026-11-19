@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../api/models.dart';
 import '../theme/noireel_theme.dart';
+import '../widgets/fade_slide_in.dart';
 import '../widgets/poster_card.dart';
 
 /// The details page for one movie or show (GU-03): poster and facts,
@@ -54,30 +55,19 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
                       child: Center(child: CircularProgressIndicator()),
                     )
                   else if (snapshot.hasError)
-                    _ErrorMessage(error: snapshot.error, onRetry: _retry)
-                  else ...[
-                    _MoodSection(details: details!),
-                    if (details.synopsis?.trim().isNotEmpty ?? false)
-                      _Section(
-                        title: 'Overview',
-                        child: Text(details.synopsis!.trim()),
+                    FadeSlideIn(
+                      child: _ErrorMessage(
+                        error: snapshot.error,
+                        onRetry: _retry,
                       ),
-                    if (details.directors.isNotEmpty)
-                      _Section(
-                        title: 'Directed by',
-                        child: Text(_names(details.directors)),
+                    )
+                  else
+                    for (final (i, section) in _sections(details!).indexed)
+                      FadeSlideIn.staggered(
+                        index: i,
+                        step: const Duration(milliseconds: 80),
+                        child: section,
                       ),
-                    if (details.creators.isNotEmpty)
-                      _Section(
-                        title: 'Created by',
-                        child: Text(_names(details.creators)),
-                      ),
-                    if (details.cast.isNotEmpty)
-                      _Section(
-                        title: 'Cast',
-                        child: _CastList(cast: details.cast),
-                      ),
-                  ],
                 ],
               ),
             ),
@@ -86,6 +76,32 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
       ),
     );
   }
+
+  /// The parts of the page below the header, skipping empty ones
+  /// (GU-03.04)
+  static List<Widget> _sections(TitleDetails details) => [
+        _MoodSection(details: details),
+        if (details.synopsis?.trim().isNotEmpty ?? false)
+          _Section(
+            title: 'Overview',
+            child: Text(details.synopsis!.trim()),
+          ),
+        if (details.directors.isNotEmpty)
+          _Section(
+            title: 'Directed by',
+            child: Text(_names(details.directors)),
+          ),
+        if (details.creators.isNotEmpty)
+          _Section(
+            title: 'Created by',
+            child: Text(_names(details.creators)),
+          ),
+        if (details.cast.isNotEmpty)
+          _Section(
+            title: 'Cast',
+            child: _CastList(cast: details.cast),
+          ),
+      ];
 
   static String _names(List<Person> people) =>
       people.map((p) => p.name).join(', ');

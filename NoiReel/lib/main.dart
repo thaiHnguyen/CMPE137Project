@@ -32,6 +32,8 @@ class NoiReelApp extends StatelessWidget {
         title: 'NoiReel',
         debugShowCheckedModeBanner: false,
         theme: palette.toThemeData(),
+        // Switch themes at once
+        themeAnimationDuration: Duration.zero,
         home: AppShell(api: api, themes: themes),
       ),
     );
