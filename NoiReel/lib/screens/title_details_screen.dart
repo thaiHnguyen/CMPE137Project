@@ -214,7 +214,7 @@ class _MoodSection extends StatelessWidget {
     }
 
     // Bars are relative to the mood with the most votes, so the top
-    // mood always fills its bar
+    // mood (the primary tag) always fills its bar
     final topVotes = votes.isEmpty ? 1 : votes.first.votes;
 
     return _Section(
@@ -241,11 +241,6 @@ class _MoodSection extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             for (final v in votes) _VoteBar(mood: v, topVotes: topVotes),
-            const SizedBox(height: 4),
-            Text(
-              '✓ = most voters picked this mood, so it shows as a tag.',
-              style: text.bodySmall,
-            ),
           ] else ...[
             const SizedBox(height: 10),
             Text(
@@ -339,7 +334,7 @@ class _VoteBar extends StatelessWidget {
           SizedBox(
             width: 52,
             child: Text(
-              '${mood.votes}${mood.isConfirmed ? ' ✓' : ''}',
+              '${mood.votes}',
               textAlign: TextAlign.right,
               style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
