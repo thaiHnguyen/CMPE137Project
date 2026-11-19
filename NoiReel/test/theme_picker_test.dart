@@ -46,7 +46,9 @@ void main() {
     await openPicker(tester);
 
     double y(String name) => tester.getCenter(find.text(name)).dy;
-    double x(String name) => tester.getCenter(find.text(name)).dx;
+    // Left edges, not centers: the selected tile also shows a check mark,
+    // which makes its label narrower
+    double x(String name) => tester.getTopLeft(find.text(name)).dx;
     expect(y('Default'), y('Hopeful'));
     expect(y('Gloomy'), y('Happy'));
     expect(y('Gloomy'), greaterThan(y('Default')));

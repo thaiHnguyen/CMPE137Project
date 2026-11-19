@@ -154,6 +154,12 @@ class NoiReelPalette {
   /// text, the app bar) pick up these colors automatically
   ThemeData toThemeData() => _built[name] ??= _buildThemeData();
 
+  static OutlineInputBorder _fieldBorder(Color color, double width) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: color, width: width),
+      );
+
   ThemeData _buildThemeData() {
     final brightness = isDark ? Brightness.dark : Brightness.light;
     final scheme =
@@ -224,8 +230,42 @@ class NoiReelPalette {
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(style: buttonStyle),
-      // Sheets (like the theme picker) use the screen background, so
-      // bodyText stays readable on them
+      // Text links (e.g. "Create one") sit on the background, so they use bodyText
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: bodyText,
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w800,
+            decoration: TextDecoration.underline,
+          ),
+        ),
+      ),
+      // Form fields: outlines, labels, icons and error text in bodyText so
+      // they read on every background. Flutter's default error red is
+      // hard to read on some themes, so errors are bold bodyText instead
+      inputDecorationTheme: InputDecorationTheme(
+        labelStyle: TextStyle(color: bodyText),
+        floatingLabelStyle: TextStyle(
+          color: bodyText,
+          fontWeight: FontWeight.w700,
+        ),
+        helperStyle: TextStyle(color: bodyText.withValues(alpha: 0.8)),
+        hintStyle: TextStyle(color: bodyText.withValues(alpha: 0.6)),
+        errorStyle: TextStyle(color: bodyText, fontWeight: FontWeight.w700),
+        prefixIconColor: bodyText,
+        suffixIconColor: bodyText,
+        enabledBorder: _fieldBorder(bodyText.withValues(alpha: 0.5), 1.5),
+        focusedBorder: _fieldBorder(bodyText, 2.5),
+        errorBorder: _fieldBorder(bodyText, 2.5),
+        focusedErrorBorder: _fieldBorder(bodyText, 3),
+        disabledBorder: _fieldBorder(bodyText.withValues(alpha: 0.3), 1.5),
+      ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: bodyText,
+        selectionColor: bodyText.withValues(alpha: 0.3),
+        selectionHandleColor: bodyText,
+      ),
+      // Sheets use the screen background, so bodyText stays readable on them
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: background,
         dragHandleColor: bodyText,

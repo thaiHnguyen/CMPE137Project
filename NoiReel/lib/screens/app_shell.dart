@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api/api_client.dart';
+import '../auth/auth_controller.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/nav_bar.dart';
 import 'coming_soon_screen.dart';
 import 'home_screen.dart';
+import 'profile_screen.dart';
 
 /// The app's frame: the tabs, with the navigation bar at the bottom
 ///
@@ -13,10 +15,16 @@ import 'home_screen.dart';
 /// back returns to the same page and scroll position
 class AppShell extends StatefulWidget {
   /// Creates the shell
-  const AppShell({super.key, required this.api, required this.themes});
+  const AppShell({
+    super.key,
+    required this.api,
+    required this.themes,
+    required this.auth,
+  });
 
   final ApiClient api;           // Connection to the server
   final ThemeController themes;  // The app's current theme
+  final AuthController auth;     // Who is logged in
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -74,12 +82,7 @@ class _AppShellState extends State<AppShell> {
           icon: tab.icon,
           description: 'Your watchlists and everything you have watched.',
         ),
-      _ => ComingSoonScreen(
-          title: 'Profile',
-          icon: tab.icon,
-          description: 'Log in or create an account to vote on moods, '
-              'rate and review.',
-        ),
+      _ => ProfileScreen(auth: widget.auth),
     };
   }
 
