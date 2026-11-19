@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'api/api_client.dart';
-import 'screens/home_screen.dart';
+import 'screens/app_shell.dart';
 import 'theme/noireel_theme.dart';
 import 'theme/theme_controller.dart';
 
@@ -32,7 +32,7 @@ class NoiReelApp extends StatelessWidget {
         title: 'NoiReel',
         debugShowCheckedModeBanner: false,
         theme: palette.toThemeData(),
-        home: HomeScreen(api: api, themes: themes),
+        home: AppShell(api: api, themes: themes),
       ),
     );
   }
