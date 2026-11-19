@@ -35,8 +35,7 @@ class TitleCard {
         'posterUrl': posterUrl,
       };
 }
-
-/// One page of titles, plus how many there are in total.
+/// One page of titles, plus how many there are in total
 typedef TitlePage = ({List<TitleCard> titles, int total});
 
 /// A person credited on a title
@@ -57,10 +56,10 @@ class Credit {
   /// `director`, `creator` or `cast`
   final String role;
 
-  /// Character played. Cast only.
+  /// Character played. Cast only
   final String? character;
 
-  /// JSON for a director or creator.
+  /// JSON for a director or creator
   Map<String, dynamic> toJson() => {'personId': personId, 'name': name};
 
   /// JSON for a cast member
@@ -75,16 +74,14 @@ class TitleDetails {
     ResultSetRow row, {
     required this.genres,
     required this.credits,
-    required this.tags,
-    required this.votes,
+    required this.moods,
   })  : card = TitleCard.fromRow(row),
         synopsis = row.colByName('synopsis'),
         runtimeMin = _int(row.colByName('runtime_min')),
         seasons = _int(row.colByName('num_seasons')),
         episodes = _int(row.colByName('num_episodes')),
         avgRating = _double(row.colByName('avg_rating')),
-        ratingCount = int.parse(row.colByName('rating_count')!),
-        voters = int.parse(row.colByName('mood_voter_count')!);
+        ratingCount = int.parse(row.colByName('rating_count')!);
 
   /// Poster, name, year and type.
   final TitleCard card;
@@ -107,20 +104,14 @@ class TitleDetails {
   /// Number of star ratings.
   final int ratingCount;
 
-  /// Distinct users who voted any mood on this title.
-  final int voters;
-
   /// Genre names.
   final List<String> genres;
 
   /// Directors or creators, then cast in billing order.
   final List<Credit> credits;
 
-  /// Public mood tags, best first. The first one is the primary tag.
-  final List<TitleMood> tags;
-
-  /// Every mood with at least one vote, highest total first.
-  final List<TitleMood> votes;
+  /// Mood tags and vote results.
+  final TitleMoods moods;
 
   /// JSON sent to the app.
   Map<String, dynamic> toJson() => {
@@ -138,12 +129,7 @@ class TitleDetails {
           for (final c in credits)
             if (c.role == 'cast') c.toCastJson(),
         ],
-        'moods': {
-          'primary': tags.isEmpty ? null : tags.first.toJson(),
-          'secondary': [for (final t in tags.skip(1)) t.toJson()],
-          'voters': voters,
-          'votes': [for (final v in votes) v.toJson()],
-        },
+        'moods': moods.toJson(),
       };
 
   List<Map<String, dynamic>> _named(String role) => [

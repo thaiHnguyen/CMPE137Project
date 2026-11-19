@@ -17,14 +17,14 @@ class TitleDao {
   static const _topTags = 5;
 
   // A mood row holds titles that fit the mood. Titles with 1-199 TMDB votes
-  // are left out so rows don't fill up with unknown titles, unless the
-  // community or an admin put them there. 0 votes means there is no TMDB
+  // are left out so rows don't fill up with unknown titles, unless users
+  // voted the mood or an admin put them there. 0 votes means there is no TMDB
   // score to judge by (admin-created titles, or an older import)
   static const _moodRowFrom = '''
 FROM title_moods tm
 JOIN titles t ON t.title_id = tm.title_id
 WHERE tm.mood_id = :mood AND tm.mood_score > 0
-  AND (tm.is_confirmed OR tm.is_curated
+  AND (tm.community_count > 0 OR tm.is_curated
         OR t.tmdb_vote_count = 0 OR t.tmdb_vote_count >= 200)''';
 
   // Mood fit decides the order. TMDB rating, then popularity, only break ties
@@ -53,7 +53,7 @@ LIMIT :limit OFFSET :offset''';
 
   static const _title = '''
 SELECT title_id, type, name, synopsis, release_year, runtime_min, num_seasons,
-        num_episodes, poster_url, avg_rating, rating_count, mood_voter_count
+        num_episodes, poster_url, avg_rating, rating_count
 FROM titles WHERE title_id = :id''';
 
   static const _genres = '''
@@ -70,17 +70,23 @@ WHERE c.title_id = :id
 ORDER BY c.role, c.billing_order IS NULL, c.billing_order, p.name''';
 
   static const _tags = '''
-SELECT mood_id, mood_name, color_hex, votes, is_confirmed
+SELECT mood_id, mood_name, color_hex, votes
 FROM title_mood_tags
 WHERE title_id = :id
 ORDER BY tag_rank
 LIMIT $_topTags''';
 
+  // Same order as the tags, so the top bar is always the primary tag
   static const _votes = '''
-SELECT mood_id, mood_name, color_hex, votes, is_confirmed
+SELECT mood_id, mood_name, color_hex, votes
 FROM title_mood_votes
 WHERE title_id = :id
-ORDER BY votes DESC, mood_id''';
+ORDER BY votes DESC, is_curated DESC, genre_score DESC, mood_id''';
+
+  static const _voters = '''
+SELECT mood_voter_count FROM titles WHERE title_id = :id''';
+
+  static const _exists = 'SELECT 1 FROM titles WHERE title_id = :id';
 
   /// GU-03: the details page for one title, or null if it doesn't exist
   Future<TitleDetails?> findDetails(int id) async {
@@ -90,8 +96,6 @@ ORDER BY votes DESC, mood_id''';
 
     final genres = await _db.execute(_genres, params);
     final credits = await _db.execute(_credits, params);
-    final tags = await _db.execute(_tags, params);
-    final votes = await _db.execute(_votes, params);
 
     final people = credits.rows.map(Credit.fromRow).toList();
     return TitleDetails.fromRow(
@@ -101,9 +105,29 @@ ORDER BY votes DESC, mood_id''';
         ...people.where((c) => c.role != 'cast'),
         ...people.where((c) => c.role == 'cast').take(topCast),
       ],
+      moods: (await findMoods(id))!,
+    );
+  }
+
+  /// RU-11: a title's mood tags and vote results, or null if the title
+  /// doesn't exist
+  Future<TitleMoods?> findMoods(int id) async {
+    final params = {'id': id};
+    final voters = await _db.execute(_voters, params);
+    if (voters.rows.isEmpty) return null;
+    final tags = await _db.execute(_tags, params);
+    final votes = await _db.execute(_votes, params);
+    return TitleMoods(
       tags: tags.rows.map(TitleMood.fromRow).toList(),
       votes: votes.rows.map(TitleMood.fromRow).toList(),
+      voters: int.parse(voters.rows.first.colByName('mood_voter_count')!),
     );
+  }
+
+  /// True if the title exists
+  Future<bool> exists(int id) async {
+    final res = await _db.execute(_exists, {'id': id});
+    return res.rows.isNotEmpty;
   }
 
   // LIKE instead of the FULLTEXT indexes: FULLTEXT skips short and common
@@ -117,7 +141,7 @@ WHERE t.name LIKE :contains
               WHERE c.title_id = t.title_id AND p.name LIKE :contains)''';
 
   // Exact title, then title starts with it, then title contains it, then a
-  // match on a person's name. Popularity only breaks ties.
+  // match on a person's name. Popularity only breaks ties
   static const _searchTitles = '''
 SELECT t.title_id, t.type, t.name, t.release_year, t.poster_url
 $_searchFrom

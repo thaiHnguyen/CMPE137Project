@@ -7,6 +7,7 @@ Files involved (all inside `server/`):
 - `db/schema.sql`: Creates all 29 tables 
 - `bin/import_tmdb.dart`: Downloads titles, genres and cast from TMDB into the tables 
 - `db/seed_moods.sql`: Adds the 6 moods and maps each genre to its moods
+- `db/update_vote_rules.sql`: Switches an existing database to the Nov 2026 mood voting rules without wiping data (see "Updating an existing database")
 - `.env`: Your MySQL password and the TMDB key (never committed these) 
 
 ---
@@ -122,6 +123,14 @@ LIMIT 20;
 The first query shows how many movies and shows you have; the second lists titles with their genres.
 
 ---
+
+## Updating an existing database
+
+When the schema changes, an update script switches your database over without wiping it. Run each one once in Workbench (open it with **File -> Open SQL Script** and click the lightning bolt). They're safe to run again.
+
+- `db/update_vote_rules.sql` (Nov 2026): the mood with the most votes becomes a title's primary tag, every vote counts right away (no 5-voter minimum, no majority rule), and each user can vote up to 3 moods per title. Your titles, accounts and votes are kept. The last query shows the top tags of voted titles.
+
+A fresh install doesn't need these: `schema.sql` always has the latest version.
 
 ## Notes about the design
 

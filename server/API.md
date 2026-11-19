@@ -58,12 +58,15 @@ Title details:
   "creators": [],
   "cast": [{"personId": 2, "name": "...", "character": "..."}],
   "moods": {
-    "primary": {"moodId": 5, "name": "Calm", "colorHex": "#EAE9E5", "votes": 3, "isConfirmed": true},
-    "secondary": [{"moodId": 2, "name": "Gloomy", "colorHex": "#1D5632", "votes": 0, "isConfirmed": false}],
-    "voters": 5,
+    "primary": {"moodId": 5, "name": "Calm", "colorHex": "#EAE9E5", "votes": 3},
+    "secondary": [
+      {"moodId": 6, "name": "Excited", "colorHex": "#BE280F", "votes": 2},
+      {"moodId": 2, "name": "Gloomy", "colorHex": "#1D5632", "votes": 0}
+    ],
+    "voters": 4,
     "votes": [
-      {"moodId": 5, "name": "Calm", "colorHex": "#EAE9E5", "votes": 3, "isConfirmed": true},
-      {"moodId": 6, "name": "Excited", "colorHex": "#BE280F", "votes": 2, "isConfirmed": false}
+      {"moodId": 5, "name": "Calm", "colorHex": "#EAE9E5", "votes": 3},
+      {"moodId": 6, "name": "Excited", "colorHex": "#BE280F", "votes": 2}
     ]
   }
 }
@@ -71,6 +74,34 @@ Title details:
 
 Rules:
 
-- **Mood rows:** ranked by mood fit (`mood_score`). TMDB rating, then popularity, only break ties. Titles with 1-199 TMDB votes are left out unless the community confirmed the mood or an admin curated it.
-- **Mood tags:** `primary` and `secondary` hold up to 5 public tags in total, which can come from the title's genres, so a tag can have 0 votes. `votes` is the Fragrantica-style results panel: every mood with at least one vote, highest first, including moods the majority hasn't adopted.
+- **Mood rows:** ranked by mood fit (`mood_score`). TMDB rating, then popularity, only break ties. `mood_score` is genre fit + votes + admin curation. Titles with 1-199 TMDB votes are left out unless users voted the mood or an admin curated it.
+- **Mood tags:** the mood with the most votes is `primary`, then `secondary` in order of votes, up to 5 tags in total. Every vote counts right away. Moods nobody voted for yet come after the voted ones, ordered by genre fit, so before anyone votes all tags come from the title's genres (0 votes). Ties in votes go to the better genre fit. `voters` is how many different users voted any mood on the title.
+- **Vote results:** `votes` is the Fragrantica-style results panel: every mood with at least one vote, in the same order as the tags.
 - **Search:** matches part of a title, director, creator or cast name, ignoring case. Results go exact title, title starts with the keyword, title contains it, then person match. The keyword is 1-100 characters. For `total: 0`, show "No results" and a suggestion to broaden the search (GU-02.04).
+
+## Mood voting
+
+Needs a logged-in registered user (`Authorization: Bearer <token>`). Each user can vote **up to 3 moods per title**, and opposite moods (like Hopeful and Gloomy) are allowed.
+
+| Method & path | Success | Errors |
+|---|---|---|
+| `GET /titles/:id/votes` | `200` vote state (below) | `401` · `404 {error:"not_found"}` |
+| `PUT /titles/:id/votes/:moodId` | `200` vote state | `401` · `403 {error:"forbidden"}` (admin) · `404` · `409 {error:"vote_limit", message, maxVotes}` |
+| `DELETE /titles/:id/votes/:moodId` | `200` vote state | `401` · `403` · `404` |
+
+Vote state:
+
+```json
+{
+  "titleId": 4,
+  "myMoodIds": [5, 2],
+  "maxVotes": 3,
+  "moods": {"primary": {...}, "secondary": [...], "voters": 4, "votes": [...]}
+}
+```
+
+- `myMoodIds` are the moods this user voted on this title. Use them to highlight the user's choices.
+- `moods` has the same shape as in title details, already updated with this vote, so the app can redraw without loading the title again.
+- `PUT` and `DELETE` are safe to repeat: voting a mood twice or removing a vote that isn't there changes nothing and still returns `200`.
+- `401 {error:"unauthorized", message}` means the token is missing or expired. Send the user to the login screen.
+- `409 vote_limit` means the user already has 3 moods on this title. Show the message; they can remove one and pick another.
