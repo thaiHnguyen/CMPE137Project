@@ -80,7 +80,7 @@ void main() {
 
     await tester.tap(find.text('Search'));
     await tester.pumpAndSettle();
-    expect(find.text('Coming soon'), findsOneWidget);
+    expect(find.text('Find a movie or show'), findsOneWidget);
     expect(find.byIcon(Icons.search), findsWidgets); // filled = selected
     expect(find.byIcon(Icons.home_outlined), findsOneWidget);
 

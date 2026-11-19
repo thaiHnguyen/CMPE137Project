@@ -69,6 +69,21 @@ class ApiClient {
     return TitleDetails.fromJson(json);
   }
 
+  /// `GET /search?q=`: titles whose name, director/creator or cast match
+  /// [query], best match first, [limit] per page (GU-02.02)
+  Future<TitlePage> search(
+    String query, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final json = await _get('/search', {
+      'q': query,
+      'page': '$page',
+      'limit': '$limit',
+    });
+    return TitlePage.fromJson(json);
+  }
+
   /// `POST /auth/register`: creates an account and logs it in (GU-07).
   /// A rejected field comes back as an [ApiException] with [ApiException.field]
   Future<AuthResult> register({

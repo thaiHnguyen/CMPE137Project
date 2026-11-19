@@ -8,6 +8,7 @@ import '../widgets/nav_bar.dart';
 import 'coming_soon_screen.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
+import 'search_screen.dart';
 
 /// The app's frame: the tabs, with the navigation bar at the bottom
 ///
@@ -66,11 +67,7 @@ class _AppShellState extends State<AppShell> {
     final tab = navTabs[index];
     return switch (index) {
       0 => HomeScreen(api: widget.api, themes: widget.themes),
-      1 => ComingSoonScreen(
-          title: 'Search',
-          icon: tab.icon,
-          description: 'Find movies and shows by title, director or cast.',
-        ),
+      1 => SearchScreen(api: widget.api),
       2 => ComingSoonScreen(
           title: 'Mood',
           icon: tab.icon,
