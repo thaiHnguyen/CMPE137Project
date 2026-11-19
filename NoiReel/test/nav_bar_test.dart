@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:flutter_application_1/api/api_client.dart';
+import 'package:flutter_application_1/auth/auth_controller.dart';
 import 'package:flutter_application_1/screens/app_shell.dart';
 import 'package:flutter_application_1/theme/noireel_theme.dart';
 import 'package:flutter_application_1/theme/theme_controller.dart';
@@ -67,7 +68,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: calm.toThemeData(),
-        home: AppShell(api: api, themes: ThemeController(calm)),
+        home: AppShell(
+          api: api,
+          themes: ThemeController(calm),
+          auth: AuthController(api), // guest
+        ),
       ),
     );
     await tester.pumpAndSettle();
