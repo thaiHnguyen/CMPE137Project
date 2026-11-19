@@ -31,7 +31,6 @@ void main() {
         'name': 'Calm',
         'colorHex': '#EAE9E5',
         'votes': 3,
-        'isConfirmed': true,
       },
       'secondary': [
         {
@@ -39,13 +38,12 @@ void main() {
           'name': 'Gloomy',
           'colorHex': null,
           'votes': 0,
-          'isConfirmed': false,
         },
       ],
       'voters': 5,
       'votes': [
-        {'moodId': 5, 'name': 'Calm', 'votes': 3, 'isConfirmed': true},
-        {'moodId': 6, 'name': 'Excited', 'votes': 2, 'isConfirmed': false},
+        {'moodId': 5, 'name': 'Calm', 'votes': 3},
+        {'moodId': 6, 'name': 'Excited', 'votes': 2},
       ],
     },
   };
@@ -61,7 +59,7 @@ void main() {
     expect(d.creators, isEmpty);
     expect(d.cast.single.character, 'Hero');
     expect(d.primaryMood!.name, 'Calm');
-    expect(d.primaryMood!.isConfirmed, isTrue);
+    expect(d.primaryMood!.votes, 3);
     expect(d.secondaryMoods.single.votes, 0);
     expect(d.voters, 5);
     expect(d.votes.map((v) => v.name), ['Calm', 'Excited']);
