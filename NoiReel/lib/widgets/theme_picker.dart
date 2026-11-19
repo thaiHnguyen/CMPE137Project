@@ -9,6 +9,7 @@ Future<void> showThemePicker(BuildContext context, ThemeController controller) {
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    useRootNavigator: true, // cover the whole screen, nav bar included
     isScrollControlled: true,
     builder: (context) => _ThemePicker(controller: controller),
   );
