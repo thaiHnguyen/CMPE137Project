@@ -12,8 +12,9 @@
 --   watchlists.view_count) are maintained by
 --   the server inside the same transaction as the change (RU-06.03,
 --   RU-13.04). ON DELETE CASCADE does not fix them.
--- * Mood vote counts and the majority rule are handled in one place:
+-- * Mood vote counts are kept up to date in one place:
 --   after any change to user_mood_tags, CALL refresh_title_moods(title_id).
+--   A user can vote at most 3 moods per title; the server enforces this.
 -- * Rules MySQL cannot enforce here, so the server must:
 --   - watch_logs.watched_on is never in the future
 --   - one is_default watchlist per user, which cannot be deleted (RU-08.06)
@@ -217,30 +218,31 @@ CREATE TABLE genre_moods (
   CONSTRAINT chk_gm_weight CHECK (weight BETWEEN 0 AND 1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Mood tags per title, Fragrantica-style: every user can vote any moods
--- on a title, and the vote totals are shown to everyone.
+-- Mood tags per title, Fragrantica-style: each user can vote up to 3 moods
+-- on a title (opposite moods allowed), and the vote totals are shown to
+-- everyone. The mood with the most votes is the title's primary tag, then
+-- the 2nd most, and so on; every vote counts right away.
 --   genre_score     0-1 starting tag from the title's genres (genre_moods),
---                   refreshed by the importer and seed_moods.sql
---   community_count users who voted this mood (RU-11.03)
---   is_confirmed    the community has adopted this tag: at least 5 people
---                   voted on the title AND more than half of them picked
---                   this mood. Below that, a vote stays a personal tag that
---                   only its voter sees. Set by CALL refresh_title_moods().
+--                   refreshed by the importer and seed_moods.sql. Decides the
+--                   tags before anyone votes, and breaks ties in votes.
+--   community_count users who voted this mood (RU-11.03),
+--                   set by CALL refresh_title_moods()
 --   is_curated      admin-set tag (AD-05.04)
---   mood_score      ranking signal for mood rows/search, and decides which
---                   tag is primary: confirmed (2+) > curated (1) > genre (0-1).
---                   Unconfirmed votes add nothing.
+--   mood_score      how well the title fits this mood, for ranking mood rows
+--                   and mood search. Genre fit plus votes (LN, so a few votes
+--                   count a lot but one title can't run away), +1 if curated.
+--                   Tag order on a title uses the vote counts instead
+--                   (see the title_mood_tags view).
 CREATE TABLE title_moods (
   title_id        BIGINT UNSIGNED NOT NULL,
   mood_id         INT UNSIGNED NOT NULL,
   genre_score     DECIMAL(4,3) NOT NULL DEFAULT 0,
   community_count INT UNSIGNED NOT NULL DEFAULT 0,
-  is_confirmed    BOOLEAN NOT NULL DEFAULT FALSE,
   is_curated      BOOLEAN NOT NULL DEFAULT FALSE,
   mood_score      DECIMAL(7,3) AS (
-                    IF(is_confirmed, 2 + LN(1 + community_count) / 10, 0)
-                    + IF(is_curated, 1, 0)
-                    + genre_score) STORED,
+                    genre_score
+                    + LN(1 + community_count)
+                    + IF(is_curated, 1, 0)) STORED,
   PRIMARY KEY (title_id, mood_id),
   KEY idx_tm_mood_score (mood_id, mood_score),
   CONSTRAINT fk_tm_title FOREIGN KEY (title_id) REFERENCES titles (title_id) ON DELETE CASCADE,
@@ -461,18 +463,14 @@ CREATE TABLE moderation_actions (
   CONSTRAINT fk_ma_admin FOREIGN KEY (admin_id) REFERENCES admins (user_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---------------------------------------------------------------------
 -- Mood voting logic
--- ---------------------------------------------------------------------
-
 -- Call after ANY change to user_mood_tags for a title (vote, unvote, user
 -- deleted): CALL refresh_title_moods(title_id);
--- Recounts the votes and re-applies the majority rule for every mood on it.
+-- Recounts the votes for every mood on it, and the number of voters.
 DELIMITER //
 CREATE PROCEDURE refresh_title_moods(IN p_title_id BIGINT UNSIGNED)
 BEGIN
   DECLARE v_voters INT UNSIGNED;
-  DECLARE v_min_voters INT UNSIGNED DEFAULT 5;   -- the "5 users" in the rule
 
   SELECT COUNT(DISTINCT user_id) INTO v_voters
   FROM user_mood_tags WHERE title_id = p_title_id;
@@ -488,16 +486,16 @@ BEGIN
     SELECT mood_id, COUNT(*) AS votes
     FROM user_mood_tags WHERE title_id = p_title_id GROUP BY mood_id
   ) v ON v.mood_id = tm.mood_id
-  SET tm.community_count = COALESCE(v.votes, 0),
-      tm.is_confirmed    = (v_voters >= v_min_voters AND COALESCE(v.votes, 0) * 2 > v_voters)
+  SET tm.community_count = COALESCE(v.votes, 0)
   WHERE tm.title_id = p_title_id;
 END //
 DELIMITER ;
 
--- Public mood tags for each title, ranked. tag_rank 1 = primary tag,
--- 2+ = secondary tags. Vote totals are included so the app can show
--- results by default. A user's own unconfirmed votes (personal tags) come
--- from user_mood_tags WHERE user_id = ?.
+-- Mood tags for each title, ranked. tag_rank 1 = primary tag, 2+ =
+-- secondary tags. Most votes first; moods nobody voted for yet come after,
+-- in order of admin curation, then genre fit. Ties in votes go to the
+-- better genre fit. A user's own votes come from
+-- user_mood_tags WHERE user_id = ?.
 CREATE VIEW title_mood_tags AS
 SELECT tm.title_id,
         tm.mood_id,
@@ -505,18 +503,19 @@ SELECT tm.title_id,
         m.color_hex,
         tm.community_count AS votes,
         t.mood_voter_count AS voters,
-        tm.is_confirmed,
         tm.mood_score,
         ROW_NUMBER() OVER (PARTITION BY tm.title_id
-                            ORDER BY tm.mood_score DESC, tm.community_count DESC, m.mood_id) AS tag_rank
+                            ORDER BY tm.community_count DESC, tm.is_curated DESC,
+                                      tm.genre_score DESC, m.mood_id) AS tag_rank
 FROM title_moods tm
 JOIN moods  m ON m.mood_id  = tm.mood_id AND m.is_active
 JOIN titles t ON t.title_id = tm.title_id
 WHERE tm.mood_score > 0;
 
 -- Vote results panel (like Fragrantica's "notes according to your votes"):
--- every mood that has at least one vote, with its total, shown by default.
--- Unconfirmed moods appear here as counts, but NOT as tags in title_mood_tags.
+-- every mood that has at least one vote, with its total, shown by default
+-- Sort by votes DESC, is_curated DESC, genre_score DESC, mood_id to match
+-- the tag order in title_mood_tags.
 CREATE VIEW title_mood_votes AS
 SELECT tm.title_id,
         tm.mood_id,
@@ -524,7 +523,8 @@ SELECT tm.title_id,
         m.color_hex,
         tm.community_count AS votes,
         t.mood_voter_count AS voters,
-        tm.is_confirmed
+        tm.is_curated,
+        tm.genre_score
 FROM title_moods tm
 JOIN moods  m ON m.mood_id  = tm.mood_id AND m.is_active
 JOIN titles t ON t.title_id = tm.title_id
