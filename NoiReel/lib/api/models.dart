@@ -95,7 +95,6 @@ class TitleMood {
     required this.id,
     required this.name,
     required this.votes,
-    required this.isConfirmed,
   });
 
   /// Reads one mood tag or vote total from the server's JSON
@@ -103,13 +102,11 @@ class TitleMood {
     id: json['moodId'] as int,
     name: json['name'] as String,
     votes: json['votes'] as int,
-    isConfirmed: json['isConfirmed'] as bool,
   );
 
   final int id; // `moodId`
   final String name; // Mood name. Matches a theme name
   final int votes; // Users who voted for this mood on this title
-  final bool isConfirmed; // True once most voters picked this mood
 }
 
 /// Everything on the title details page, from `GET /titles/:id` (GU-03).
@@ -168,8 +165,8 @@ class TitleDetails {
   final List<Person> directors; // Movies
   final List<Person> creators; // TV shows
   final List<Person> cast; // Top 10, in billing order
-  final TitleMood? primaryMood; // The title's main mood tag
-  final List<TitleMood> secondaryMoods; // Supporting mood tags
+  final TitleMood? primaryMood; // Mood with the most votes (genre fit before any votes)
+  final List<TitleMood> secondaryMoods; // Next moods, in order of votes
   final int voters; // Users who voted any mood on this title
   final List<TitleMood> votes; // Vote results, highest first
 
