@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../api/models.dart';
 import '../theme/theme_controller.dart';
+import '../widgets/fade_slide_in.dart';
 import '../widgets/mood_row.dart';
 import '../widgets/theme_picker.dart';
 import 'title_details_screen.dart';
@@ -49,29 +50,40 @@ class _HomeScreenState extends State<HomeScreen> {
             return ListView(
               padding: const EdgeInsets.only(bottom: 24),
               children: [
-                _MoodPicker(themes: widget.themes),
+                FadeSlideIn(child: _MoodPicker(themes: widget.themes)),
                 if (loading)
                   const Padding(
                     padding: EdgeInsets.all(48),
                     child: Center(child: CircularProgressIndicator()),
                   )
                 else if (snapshot.hasError)
-                  _Notice(text: '${snapshot.error}', onRetry: _reload)
+                  FadeSlideIn(
+                    child: _Notice(text: '${snapshot.error}', onRetry: _reload),
+                  )
                 else if (moods.isEmpty)
-                  const _Notice(
-                    text: 'No moods yet. Run db/seed_moods.sql on the server.',
+                  const FadeSlideIn(
+                    child: _Notice(
+                      text: 'No moods yet. '
+                          'Run db/seed_moods.sql on the server.',
+                    ),
                   )
                 else
-                  for (final mood in moods)
-                    MoodRow(
+                  for (final (i, mood) in moods.indexed)
+                    FadeSlideIn.staggered(
                       key: ValueKey('${mood.id}-$_reloads'),
-                      mood: mood,
-                      api: widget.api,
-                      onTitleTap: (title) => Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              TitleDetailsScreen(api: widget.api, title: title),
+                      index: i + 1, // after the theme button
+                      step: const Duration(milliseconds: 90),
+                      child: MoodRow(
+                        mood: mood,
+                        api: widget.api,
+                        onTitleTap: (title) => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => TitleDetailsScreen(
+                              api: widget.api,
+                              title: title,
+                            ),
+                          ),
                         ),
                       ),
                     ),

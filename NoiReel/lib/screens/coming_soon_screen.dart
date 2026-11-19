@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/fade_slide_in.dart';
+
 /// Placeholder for a tab that isn't built yet
 class ComingSoonScreen extends StatelessWidget {
   /// Creates a placeholder for the [title] tab
@@ -20,24 +22,26 @@ class ComingSoonScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('NOIREEL')),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 64, color: text.bodyMedium?.color),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: text.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
+        child: FadeSlideIn(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 64, color: text.bodyMedium?.color),
+                const SizedBox(height: 16),
+                Text(
+                  title,
+                  style: text.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(description, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              Text('Coming soon', style: text.bodySmall),
-            ],
+                const SizedBox(height: 8),
+                Text(description, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                Text('Coming soon', style: text.bodySmall),
+              ],
+            ),
           ),
         ),
       ),
