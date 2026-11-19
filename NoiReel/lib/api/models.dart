@@ -180,3 +180,45 @@ class TitleDetails {
       TitleMood.fromJson(m as Map<String, dynamic>),
   ];
 }
+
+/// What the server sends after signing up or logging in
+class AuthResult {
+  /// Creates an [AuthResult]
+  const AuthResult({
+    required this.token,
+    required this.userId,
+    required this.role,
+  });
+
+  /// Reads the server's JSON
+  factory AuthResult.fromJson(Map<String, dynamic> json) => AuthResult(
+    token: json['token'] as String,
+    userId: json['userId'] as int,
+    role: json['role'] as String,
+  );
+
+  final String token; // Sent as `Authorization: Bearer <token>`
+  final int userId;   // `user_accounts.user_id`
+  final String role;  // `user` or `admin`
+}
+
+/// Who a session belongs to, from `GET /auth/session`
+class SessionInfo {
+  /// Creates a [SessionInfo]
+  const SessionInfo({
+    required this.userId,
+    required this.username,
+    required this.role,
+  });
+
+  /// Reads the server's JSON
+  factory SessionInfo.fromJson(Map<String, dynamic> json) => SessionInfo(
+    userId: json['userId'] as int,
+    username: json['username'] as String,
+    role: json['role'] as String,
+  );
+
+  final int userId;
+  final String username;
+  final String role; // `user` or `admin`
+}
