@@ -69,6 +69,16 @@ class ApiClient {
     return TitleDetails.fromJson(json);
   }
 
+  /// `GET /discover`: [limit] random titles with posters for the home
+  /// page's Discovery grid. Different titles on every call
+  Future<List<TitleCard>> discover({int limit = 30}) async {
+    final json = await _get('/discover', {'limit': '$limit'});
+    return [
+      for (final t in json['titles'] as List<dynamic>)
+        TitleCard.fromJson(t as Map<String, dynamic>),
+    ];
+  }
+
   /// `GET /search?q=`: titles whose name, director/creator or cast match
   /// [query], best match first, [limit] per page (GU-02.02)
   Future<TitlePage> search(
