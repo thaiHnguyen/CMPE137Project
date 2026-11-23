@@ -38,6 +38,7 @@ None of these need a login. Lists take optional `?page=` (default 1) and `?limit
 | `GET /moods/:id/titles` | `200 {mood: Mood, page, limit, total, titles: [TitleCard]}` | `404 {error:"not_found", message}` |
 | `GET /titles/:id` | `200` title details (below) | `404 {error:"not_found", message}` |
 | `GET /search?q=` | `200 {query, page, limit, total, titles: [TitleCard]}` | `400 {error:"invalid", field:"q", message}` |
+| `GET /discover?limit=30` | `200 {titles: [TitleCard]}` | `400 {error:"invalid", message}` |
 
 ```
 Mood      {moodId, name, description, colorHex, counterMoodIds: [int]}
@@ -77,6 +78,7 @@ Rules:
 - **Mood rows:** ranked by mood fit (`mood_score`). TMDB rating, then popularity, only break ties. `mood_score` is genre fit + votes + admin curation. Titles with 1-199 TMDB votes are left out unless users voted the mood or an admin curated it.
 - **Mood tags:** the mood with the most votes is `primary`, then `secondary` in order of votes, up to 5 tags in total. Every vote counts right away. Moods nobody voted for yet come after the voted ones, ordered by genre fit, so before anyone votes all tags come from the title's genres (0 votes). Ties in votes go to the better genre fit. `voters` is how many different users voted any mood on the title.
 - **Vote results:** `votes` is the Fragrantica-style results panel: every mood with at least one vote, in the same order as the tags.
+- **Discover:** random titles for the home page's Discovery grid, different on every call. Only titles with a poster and at least 200 TMDB votes (or no TMDB score at all, e.g. added by an admin). `limit` is 1-60, default 30.
 - **Search:** matches part of a title, director, creator or cast name, ignoring case. Results go exact title, title starts with the keyword, title contains it, then person match. The keyword is 1-100 characters. For `total: 0`, show "No results" and a suggestion to broaden the search (GU-02.04).
 
 ## Mood voting
