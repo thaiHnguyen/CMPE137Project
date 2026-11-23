@@ -7,6 +7,7 @@ import '../theme/theme_controller.dart';
 import '../widgets/nav_bar.dart';
 import 'coming_soon_screen.dart';
 import 'home_screen.dart';
+import 'mood_screen.dart';
 import 'profile_screen.dart';
 import 'search_screen.dart';
 
@@ -40,13 +41,24 @@ class _AppShellState extends State<AppShell> {
     (_) => GlobalKey<NavigatorState>(),
   );
 
+  // Counts Home taps. Each change tells the home page to reshuffle its
+  // Discovery grid
+  final _homeTapped = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    _homeTapped.dispose();
+    super.dispose();
+  }
+
   void _selectTab(int index) {
     if (index == _current) {
       // Tapping the open tab again goes back to its first page
       _navigators[index].currentState?.popUntil((route) => route.isFirst);
-      return;
+    } else {
+      setState(() => _current = index);
     }
-    setState(() => _current = index);
+    if (index == 0) _homeTapped.value++;
   }
 
   /// Android back button: go back within the tab first, then to Home,
@@ -66,14 +78,13 @@ class _AppShellState extends State<AppShell> {
   Widget _rootPage(int index) {
     final tab = navTabs[index];
     return switch (index) {
-      0 => HomeScreen(api: widget.api, themes: widget.themes),
-      1 => SearchScreen(api: widget.api),
-      2 => ComingSoonScreen(
-          title: 'Mood',
-          icon: tab.icon,
-          description: 'Tell NoiReel how you feel and how much time you '
-              'have, and get picks that match.',
+      0 => HomeScreen(
+          api: widget.api,
+          themes: widget.themes,
+          reshuffle: _homeTapped,
         ),
+      1 => SearchScreen(api: widget.api),
+      2 => MoodScreen(api: widget.api),
       3 => ComingSoonScreen(
           title: 'Lists',
           icon: tab.icon,
@@ -134,7 +145,7 @@ class _TabEntranceState extends State<_TabEntrance>
   // own entrance animation
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 280),
+    duration: const Duration(milliseconds: 400),
     value: 1,
   );
 
