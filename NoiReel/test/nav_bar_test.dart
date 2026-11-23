@@ -52,41 +52,109 @@ void main() {
     int? tapped;
     await tester.pumpWidget(barApp(current: 0, onTap: (i) => tapped = i));
 
-    await tester.tap(find.text('Lists'));
+    await tester.tap(find.byIcon(Icons.bookmarks_outlined)); // Lists
     expect(tapped, 3);
   });
 
-  testWidgets('switching tabs shows that tab and keeps the bar',
-      (tester) async {
-    // A fake server with no moods, so the home page loads instantly
-    final api = ApiClient(
-      baseUrl: 'http://test',
-      client: MockClient(
-        (_) async => http.Response(jsonEncode({'moods': <Object>[]}), 200),
-      ),
-    );
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: calm.toThemeData(),
-        home: AppShell(
-          api: api,
-          themes: ThemeController(calm),
-          auth: AuthController(api), // guest
+  testWidgets('the bar spans the full width of the screen', (tester) async {
+    await tester.pumpWidget(barApp(current: 0));
+
+    final bar = tester.getRect(find.byType(NoiReelNavBar));
+    final screen = tester.getRect(find.byType(Scaffold));
+    expect(bar.left, screen.left);
+    expect(bar.right, screen.right);
+    expect(bar.bottom, screen.bottom);
+  });
+
+  group('shell', () {
+    // A pretend server: 3 random titles for Discovery, no moods
+    late int discoverCalls;
+    late ApiClient api;
+
+    setUp(() {
+      discoverCalls = 0;
+      api = ApiClient(
+        baseUrl: 'http://test',
+        client: MockClient((req) async {
+          if (req.url.path == '/discover') {
+            discoverCalls++;
+            return http.Response(
+              jsonEncode({
+                'titles': [
+                  for (var i = 1; i <= 3; i++)
+                    {
+                      'titleId': i,
+                      'type': 'movie',
+                      'name': 'Film $i',
+                      'year': 2000 + i,
+                      'posterUrl': null,
+                    },
+                ],
+              }),
+              200,
+            );
+          }
+          return http.Response(jsonEncode({'moods': <Object>[]}), 200);
+        }),
+      );
+    });
+
+    Future<void> pumpShell(WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: calm.toThemeData(),
+          home: AppShell(
+            api: api,
+            themes: ThemeController(calm),
+            auth: AuthController(api), // guest
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.textContaining('No moods yet'), findsOneWidget);
+      );
+      await tester.pumpAndSettle();
+    }
 
-    await tester.tap(find.text('Search'));
-    await tester.pumpAndSettle();
-    expect(find.text('Find a movie or show'), findsOneWidget);
-    expect(find.byIcon(Icons.search), findsWidgets); // filled = selected
-    expect(find.byIcon(Icons.home_outlined), findsOneWidget);
+    testWidgets('Home shows the Discovery grid', (tester) async {
+      await pumpShell(tester);
 
-    await tester.tap(find.text('Home'));
-    await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.home), findsOneWidget);
-    expect(find.textContaining('No moods yet'), findsOneWidget);
+      expect(find.text('Discovery'), findsOneWidget);
+      expect(find.byTooltip('Film 1'), findsOneWidget);
+      expect(find.byTooltip('Film 3'), findsOneWidget);
+    });
+
+    testWidgets('switching tabs shows that tab and keeps the bar',
+        (tester) async {
+      await pumpShell(tester);
+
+      await tester.tap(find.byIcon(Icons.search_outlined));
+      await tester.pumpAndSettle();
+      expect(find.text('Find a movie or show'), findsOneWidget);
+      expect(find.byIcon(Icons.home_outlined), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.theater_comedy_outlined));
+      await tester.pumpAndSettle();
+      expect(find.text('Browse by mood'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.home_outlined));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.home), findsOneWidget);
+      expect(find.text('Discovery'), findsOneWidget);
+    });
+
+    testWidgets('tapping Home reshuffles the grid', (tester) async {
+      await pumpShell(tester);
+      expect(discoverCalls, 1);
+
+      // Already on Home: tap it again
+      await tester.tap(find.byIcon(Icons.home));
+      await tester.pumpAndSettle();
+      expect(discoverCalls, 2);
+
+      // Coming back to Home from another tab
+      await tester.tap(find.byIcon(Icons.search_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.home_outlined));
+      await tester.pumpAndSettle();
+      expect(discoverCalls, 3);
+    });
   });
 }

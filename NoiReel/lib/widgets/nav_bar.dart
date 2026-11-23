@@ -9,7 +9,7 @@ class NavTab {
     required this.selectedIcon,
   });
 
-  final String label;         // Under the icon; read by screen readers
+  final String label;         // Read by screen readers; shown if showLabels
   final IconData icon;        // Outlined icon, when the tab isn't selected
   final IconData selectedIcon; // Filled icon, when the tab is selected
 }
@@ -44,9 +44,9 @@ const navTabs = [
   ),
 ];
 
-/// The rounded bar at the bottom of every screen, in the current theme's
-/// nav bar colors. The selected tab has a filled icon in full color; the
-/// others have an outlined icon, dimmed
+/// The bar along the bottom edge of every screen.
+/// The selected tab has a filled icon; the others have an
+/// outlined icon, dimmed
 class NoiReelNavBar extends StatelessWidget {
   /// Creates the bar
   const NoiReelNavBar({
@@ -56,8 +56,8 @@ class NoiReelNavBar extends StatelessWidget {
     this.tabs = navTabs,
   });
 
-  /// Set to false to show icons only, like Letterboxd
-  static const showLabels = true;
+  /// Set to true to show a label under each icon. Off, like Letterboxd
+  static const showLabels = false;
 
   /// How strong the unselected tabs are, from 0 (invisible) to 1 (full)
   static const unselectedOpacity = 0.55;
@@ -70,25 +70,33 @@ class NoiReelNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return SafeArea(
-      minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: colors.secondary, // the theme's navBar
-          borderRadius: BorderRadius.circular(16),
+    // The color fills edge to edge and down past the phone's gesture
+    // area; SafeArea only keeps the icons clear of it
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.secondary, // the theme's navBar
+        border: Border(
+          top: BorderSide(
+            color: colors.onSecondary.withValues(alpha: 0.12),
+          ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Row(
-          children: [
-            for (var i = 0; i < tabs.length; i++)
-              Expanded(
-                child: _NavItem(
-                  tab: tabs[i],
-                  selected: i == currentIndex,
-                  onTap: () => onTap(i),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            children: [
+              for (var i = 0; i < tabs.length; i++)
+                Expanded(
+                  child: _NavItem(
+                    tab: tabs[i],
+                    selected: i == currentIndex,
+                    onTap: () => onTap(i),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -120,16 +128,28 @@ class _NavItem extends StatelessWidget {
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(18),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 4),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                selected ? tab.selectedIcon : tab.icon,
-                color: color,
-                size: 26,
+              // The highlight behind the selected icon, like Letterboxd's
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 60,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? navText.withValues(alpha: 0.18)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  selected ? tab.selectedIcon : tab.icon,
+                  color: color,
+                  size: 26,
+                ),
               ),
               if (NoiReelNavBar.showLabels) ...[
                 const SizedBox(height: 2),
