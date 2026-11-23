@@ -154,6 +154,24 @@ LIMIT :limit OFFSET :offset''';
 
   static const _searchCount = 'SELECT COUNT(*) AS total $_searchFrom';
 
+  // Random well-known titles with a poster, for the home page's Discovery
+  // grid. Same TMDB vote floor as mood rows. ORDER BY RAND() reads the
+  // whole titles table each time, which is fine for a catalog of a few
+  // thousand titles
+  static const _discover = '''
+SELECT title_id, type, name, release_year, poster_url
+FROM titles
+WHERE poster_url IS NOT NULL
+  AND (tmdb_vote_count = 0 OR tmdb_vote_count >= 200)
+ORDER BY RAND()
+LIMIT :limit''';
+
+  /// Home page Discovery grid: [limit] random titles, different each call
+  Future<List<TitleCard>> discover(int limit) async {
+    final res = await _db.execute(_discover, {'limit': limit});
+    return res.rows.map(TitleCard.fromRow).toList();
+  }
+
   /// GU-02.02: titles whose name, director/creator or cast match [keyword]
   Future<TitlePage> search(String keyword, Paging paging) async {
     final like = escapeLike(keyword);
