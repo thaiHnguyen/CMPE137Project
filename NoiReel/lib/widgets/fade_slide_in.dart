@@ -37,7 +37,7 @@ class FadeSlideIn extends StatefulWidget {
       );
 
   /// How long the fade and slide take
-  static const defaultDuration = Duration(milliseconds: 350);
+  static const defaultDuration = Duration(milliseconds: 500);
 
   final Widget child;
   final Duration delay;     // Wait before starting
