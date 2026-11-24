@@ -80,6 +80,7 @@ Rules:
 - **Vote results:** `votes` is the Fragrantica-style results panel: every mood with at least one vote, in the same order as the tags.
 - **Discover:** random titles for the home page's Discovery grid, different on every call. Only titles with a poster and at least 200 TMDB votes (or no TMDB score at all, e.g. added by an admin). `limit` is 1-60, default 30.
 - **Search:** matches part of a title, director, creator or cast name, ignoring case. Results go exact title, title starts with the keyword, title contains it, then person match. The keyword is 1-100 characters. For `total: 0`, show "No results" and a suggestion to broaden the search (GU-02.04).
+- **Shuffled mood page:** `GET /moods/:id/titles?shuffle=<number>` returns the same titles in a random order. The same number always gives the same order, so keep it while loading more pages (no repeats) and send a new one to reshuffle. The number is 1-2147483647.
 
 ## Mood voting
 
