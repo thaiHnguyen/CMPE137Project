@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../api/models.dart';
+import '../theme/noireel_theme.dart';
 import 'fade_slide_in.dart';
 import 'poster_card.dart';
+import 'theme_picker.dart';
 
 /// One mood row on the home page: the mood's name, then a sideways list
 /// of its titles, best mood fit first (GU-01)
@@ -14,10 +16,12 @@ class MoodRow extends StatefulWidget {
     required this.mood,
     required this.api,
     this.onTitleTap,
+    this.onOpen,
   });
 
   final Mood mood;      // The mood this row shows
   final ApiClient api;  // Used to load the row's titles
+  final VoidCallback? onOpen; // Tapping the heading: open the mood's page
 
   // Called when a poster is tapped
   final void Function(TitleCard title)? onTitleTap;
@@ -40,15 +44,44 @@ class _MoodRowState extends State<MoodRow> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Color square, name and ›. The whole heading is tappable
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-          child: Row(
-            children: [
-              Text(
-                widget.mood.name,
-                style: text.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 2),
+          child: Semantics(
+            button: widget.onOpen != null,
+            label: 'See all ${widget.mood.name} titles',
+            excludeSemantics: true,
+            child: InkWell(
+              onTap: widget.onOpen,
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    MoodSwatch(
+                      palette: NoiReelPalette.byName(widget.mood.name),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      widget.mood.name,
+                      style: text.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (widget.onOpen != null)
+                      Icon(
+                        Icons.chevron_right,
+                        size: 30,
+                        color: text.titleLarge?.color,
+                      ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
         ),
         SizedBox(

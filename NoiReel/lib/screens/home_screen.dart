@@ -155,20 +155,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     sliver: SliverGrid.builder(
                       // 3 posters across on a phone, more on wider screens
-                      gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 160,
-                            childAspectRatio: 2 / 3,
-                            mainAxisSpacing: 8,
-                            crossAxisSpacing: 8,
-                          ),
+                      gridDelegate: posterGridDelegate,
                       itemCount: titles.length,
                       itemBuilder: (context, i) => FadeSlideIn.staggered(
                         key: ValueKey('$_shuffle-${titles[i].id}'),
                         index: i < 12 ? i : 0, // first screenful staggers
                         step: const Duration(milliseconds: 40),
                         distance: 16,
-                        child: _GridPoster(
+                        child: GridPoster(
                           title: titles[i],
                           onTap: () => _open(titles[i]),
                         ),
@@ -178,32 +172,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             );
           },
-        ),
-      ),
-    );
-  }
-}
-
-/// One poster in the Discovery grid. Posters only, like Letterboxd; the
-/// name is read by screen readers and shown on the details page
-class _GridPoster extends StatelessWidget {
-  const _GridPoster({required this.title, required this.onTap});
-
-  final TitleCard title;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: title.year == null ? title.name : '${title.name}, ${title.year}',
-      excludeSemantics: true,
-      child: Tooltip(
-        message: title.name,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: PosterImage(url: title.posterUrl, type: title.type),
         ),
       ),
     );
