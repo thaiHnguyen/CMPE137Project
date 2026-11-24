@@ -4,6 +4,7 @@ import '../api/api_client.dart';
 import '../api/models.dart';
 import '../widgets/fade_slide_in.dart';
 import '../widgets/mood_row.dart';
+import 'mood_titles_screen.dart';
 import 'title_details_screen.dart';
 
 /// The Mood tab: one row of posters per mood, ranked by how well each title
@@ -41,6 +42,15 @@ class _MoodScreenState extends State<MoodScreen> {
       context,
       MaterialPageRoute<void>(
         builder: (_) => TitleDetailsScreen(api: widget.api, title: title),
+      ),
+    );
+  }
+
+  void _openMood(Mood mood) {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => MoodTitlesScreen(api: widget.api, mood: mood),
       ),
     );
   }
@@ -99,6 +109,7 @@ class _MoodScreenState extends State<MoodScreen> {
                         mood: mood,
                         api: widget.api,
                         onTitleTap: _open,
+                        onOpen: () => _openMood(mood),
                       ),
                     ),
               ],
