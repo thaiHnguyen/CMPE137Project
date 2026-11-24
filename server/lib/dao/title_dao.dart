@@ -37,14 +37,32 @@ LIMIT :limit OFFSET :offset''';
 
   static const _moodRowCount = 'SELECT COUNT(*) AS total $_moodRowFrom';
 
-  /// GU-01: titles for a mood row, best mood fit first.
-  Future<TitlePage> titlesForMood(int moodId, Paging paging) async {
+  // The same titles in a random order. RAND(seed) gives the same order for
+  // the same seed, so page 2 continues page 1 with no repeats; a new seed
+  // is a new shuffle
+  static const _moodRowShuffled = '''
+SELECT t.title_id, t.type, t.name, t.release_year, t.poster_url
+$_moodRowFrom
+ORDER BY RAND(:seed), t.title_id
+LIMIT :limit OFFSET :offset''';
+
+  /// GU-01: titles for a mood row, best mood fit first. With [shuffle],
+  /// the same titles in a random order picked by that number instead
+  Future<TitlePage> titlesForMood(
+    int moodId,
+    Paging paging, {
+    int? shuffle,
+  }) async {
     final count = await _db.execute(_moodRowCount, {'mood': moodId});
-    final res = await _db.execute(_moodRowTitles, {
-      'mood': moodId,
-      'limit': paging.limit,
-      'offset': paging.offset,
-    });
+    final res = await _db.execute(
+      shuffle == null ? _moodRowTitles : _moodRowShuffled,
+      {
+        'mood': moodId,
+        'limit': paging.limit,
+        'offset': paging.offset,
+        if (shuffle != null) 'seed': shuffle,
+      },
+    );
     return (
       titles: res.rows.map(TitleCard.fromRow).toList(),
       total: int.parse(count.rows.first.colByName('total')!),
