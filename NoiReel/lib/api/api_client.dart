@@ -51,14 +51,18 @@ class ApiClient {
   }
 
   /// `GET /moods/:id/titles`: a mood row, best mood fit first
+  /// With [shuffle], the titles come in a random order picked by that
+  /// number: keep it while loading more pages, change it to reshuffle
   Future<TitlePage> getMoodTitles(
     int moodId, {
     int page = 1,
     int limit = 20,
+    int? shuffle,
   }) async {
     final json = await _get('/moods/$moodId/titles', {
       'page': '$page',
       'limit': '$limit',
+      if (shuffle != null) 'shuffle': '$shuffle',
     });
     return TitlePage.fromJson(json);
   }

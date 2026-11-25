@@ -78,6 +78,43 @@ class PosterImage extends StatelessWidget {
   }
 }
 
+/// One poster in a poster grid (home's Discovery grid, a mood's page)
+/// Posters only, the name is read by screen readers,
+/// shown on hover, and on the details page
+class GridPoster extends StatelessWidget {
+  /// Creates a [GridPoster]
+  const GridPoster({super.key, required this.title, required this.onTap});
+
+  final TitleCard title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: title.year == null ? title.name : '${title.name}, ${title.year}',
+      excludeSemantics: true,
+      child: Tooltip(
+        message: title.name,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: PosterImage(url: title.posterUrl, type: title.type),
+        ),
+      ),
+    );
+  }
+}
+
+/// Grid layout for poster grids: 3 across on a phone, more on wider
+/// screens
+const posterGridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+  maxCrossAxisExtent: 160,
+  childAspectRatio: 2 / 3,
+  mainAxisSpacing: 8,
+  crossAxisSpacing: 8,
+);
+
 /// Shown when a title has no poster, or while it loads
 class _Placeholder extends StatelessWidget {
   const _Placeholder({required this.type});
