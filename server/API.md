@@ -108,3 +108,23 @@ Vote state:
 - `PUT` and `DELETE` are safe to repeat: voting a mood twice or removing a vote that isn't there changes nothing and still returns `200`.
 - `401 {error:"unauthorized", message}` means the token is missing or expired. Send the user to the login screen.
 - `409 vote_limit` means the user already has 3 moods on this title. Show the message; they can remove one and pick another.
+
+## Your lists
+
+Needs a logged-in registered user (`Authorization: Bearer <token>`). Lists are private to their owner, and deleting an account deletes its lists. The default Watchlist is not included here.
+
+| Method & path | Body | Success | Errors |
+|---|---|---|---|
+| `GET /me/lists` | none | `200 {lists: [ListSummary]}` | `401` · `403` (admin) |
+| `POST /me/lists` | `{name, description?, titleIds: [int]}` | `201 {list: ListDetails}` | `400 {error:"invalid", field, message}` · `401` · `403` |
+| `GET /me/lists/:id` | none | `200 {list: ListDetails}` | `401` · `404 {error:"not_found"}` |
+
+```
+ListSummary {listId, name, description, entryCount, posterUrls: [string], updatedAt}
+ListDetails {listId, name, description, entryCount, entries: [TitleCard]}
+```
+
+- `name`: 1-60 characters after trimming. `description`: optional, up to 500 characters.
+- `titleIds`: the entries **in the order they were added**, up to 500. Duplicates are dropped (the first one is kept). Unknown ids give a `400` naming them.
+- `entries` come back in that same order. `posterUrls` holds the first 4 posters, for the list's card.
+- Lists are sorted most recently changed first.
