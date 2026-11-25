@@ -4,9 +4,10 @@ import 'package:flutter/services.dart';
 import '../api/api_client.dart';
 import '../auth/auth_controller.dart';
 import '../theme/theme_controller.dart';
+import '../widgets/leave_guard.dart';
 import '../widgets/nav_bar.dart';
-import 'coming_soon_screen.dart';
 import 'home_screen.dart';
+import 'lists_screen.dart';
 import 'mood_screen.dart';
 import 'profile_screen.dart';
 import 'search_screen.dart';
@@ -45,13 +46,18 @@ class _AppShellState extends State<AppShell> {
   // Discovery grid
   final _homeTapped = ValueNotifier<int>(0);
 
+  // A page with unsaved work (e.g. New List) can hold a tab switch until
+  // the user answers "Discard changes?"
+  final _leaveGuard = LeaveGuard();
+
   @override
   void dispose() {
     _homeTapped.dispose();
     super.dispose();
   }
 
-  void _selectTab(int index) {
+  Future<void> _selectTab(int index) async {
+    if (!await _leaveGuard.canLeave() || !mounted) return;
     if (index == _current) {
       // Tapping the open tab again goes back to its first page
       _navigators[index].currentState?.popUntil((route) => route.isFirst);
@@ -66,7 +72,7 @@ class _AppShellState extends State<AppShell> {
   void _onBack() {
     final tab = _navigators[_current].currentState;
     if (tab != null && tab.canPop()) {
-      tab.pop();
+      tab.maybePop(); // lets a page with unsaved work ask first
     } else if (_current != 0) {
       setState(() => _current = 0);
     } else {
@@ -76,7 +82,6 @@ class _AppShellState extends State<AppShell> {
 
   /// The first page of each tab, in the same order as navTabs
   Widget _rootPage(int index) {
-    final tab = navTabs[index];
     return switch (index) {
       0 => HomeScreen(
           api: widget.api,
@@ -85,11 +90,7 @@ class _AppShellState extends State<AppShell> {
         ),
       1 => SearchScreen(api: widget.api),
       2 => MoodScreen(api: widget.api),
-      3 => ComingSoonScreen(
-          title: 'Lists',
-          icon: tab.icon,
-          description: 'Your watchlists and everything you have watched.',
-        ),
+      3 => ListsScreen(api: widget.api, auth: widget.auth),
       _ => ProfileScreen(auth: widget.auth),
     };
   }
@@ -102,20 +103,23 @@ class _AppShellState extends State<AppShell> {
         if (!didPop) _onBack();
       },
       child: Scaffold(
-        body: IndexedStack(
-          index: _current,
-          children: [
-            for (var i = 0; i < navTabs.length; i++)
-              _TabEntrance(
-                active: i == _current,
-                child: Navigator(
-                  key: _navigators[i],
-                  onGenerateRoute: (_) => MaterialPageRoute<void>(
-                    builder: (_) => _rootPage(i),
+        body: LeaveGuardScope(
+          guard: _leaveGuard,
+          child: IndexedStack(
+            index: _current,
+            children: [
+              for (var i = 0; i < navTabs.length; i++)
+                _TabEntrance(
+                  active: i == _current,
+                  child: Navigator(
+                    key: _navigators[i],
+                    onGenerateRoute: (_) => MaterialPageRoute<void>(
+                      builder: (_) => _rootPage(i),
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
         bottomNavigationBar: NoiReelNavBar(
           currentIndex: _current,
