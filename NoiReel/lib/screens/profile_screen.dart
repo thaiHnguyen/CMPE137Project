@@ -178,7 +178,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   SnackBar(
                     content: Text(
                       '${title.name} is already in your Greatest Of All '
-                      'Time.',
+                          'Time.',
                     ),
                   ),
                 );
@@ -255,17 +255,17 @@ class _ProfileScreenState extends State<ProfileScreen>
         leading: session == null
             ? null
             : TextButton(
-                onPressed: _profile == null ? null : _openSettings,
-                style: TextButton.styleFrom(
-                  foregroundColor: navText,
-                  disabledForegroundColor: navText.withValues(alpha: 0.4),
-                  textStyle: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                child: const Text('Settings'),
-              ),
+          onPressed: _profile == null ? null : _openSettings,
+          style: TextButton.styleFrom(
+            foregroundColor: navText,
+            disabledForegroundColor: navText.withValues(alpha: 0.4),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          child: const Text('Settings'),
+        ),
         title: Text(
           session == null
               ? 'NOIREEL'
@@ -315,18 +315,18 @@ class _ProfileScreenState extends State<ProfileScreen>
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _tabController.index == _listTab
           ? FloatingActionButton.small(
-              tooltip: 'New list',
-              onPressed: () => startNewList(
-                context,
-                api: widget.api,
-                auth: widget.auth,
-                reload: _reload,
-              ),
-              backgroundColor: colors.primary,
-              foregroundColor: colors.onPrimary,
-              shape: const CircleBorder(),
-              child: const Icon(Icons.add),
-            )
+        tooltip: 'New list',
+        onPressed: () => startNewList(
+          context,
+          api: widget.api,
+          auth: widget.auth,
+          reload: _reload,
+        ),
+        backgroundColor: colors.primary,
+        foregroundColor: colors.onPrimary,
+        shape: const CircleBorder(),
+        child: const Icon(Icons.add),
+      )
           : null,
     );
   }
@@ -436,7 +436,13 @@ class _ProfileView extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 24),
-          Divider(color: bodyText.withValues(alpha: 0.25), height: 1),
+          // Splits the account from Greatest Of All Time. Made from the
+          // theme's text color, so it changes with the theme
+          Divider(
+            color: bodyText.withValues(alpha: 0.35),
+            height: 1.5,
+            thickness: 1.5,
+          ),
           const SizedBox(height: 20),
           FadeSlideIn.staggered(
             index: 3,
@@ -515,18 +521,18 @@ class _GoatSlot extends StatelessWidget {
         borderRadius: radius,
         child: title == null
             ? AspectRatio(
-                aspectRatio: 2 / 3,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: radius,
-                    border: Border.all(
-                      color: color.withValues(alpha: 0.4),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Icon(Icons.add, color: color.withValues(alpha: 0.7)),
-                ),
-              )
+          aspectRatio: 2 / 3,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              border: Border.all(
+                color: color.withValues(alpha: 0.4),
+                width: 1.5,
+              ),
+            ),
+            child: Icon(Icons.add, color: color.withValues(alpha: 0.7)),
+          ),
+        )
             : PosterImage(url: title.posterUrl, type: title.type),
       ),
     );
@@ -572,7 +578,7 @@ class _GuestView extends StatelessWidget {
                 index: 2,
                 child: const Text(
                   'Log in or create an account to vote on moods, make '
-                  'lists, and show off your Greatest Of All Time.',
+                      'lists, and show off your Greatest Of All Time.',
                   textAlign: TextAlign.center,
                 ),
               ),
