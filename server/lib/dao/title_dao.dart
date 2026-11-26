@@ -7,12 +7,9 @@ import 'package:server/models/title.dart';
 class TitleDao {
   /// Creates a DAO on a connection pool (normally the shared `db`)
   TitleDao(this._db);
-
   final MySQLConnectionPool _db;
-
   /// Top cast shown on the details page (GU-03.02)
   static const topCast = 10;
-
   /// Mood tags shown on the details page (GU-03.03)
   static const _topTags = 5;
 
@@ -70,9 +67,14 @@ LIMIT :limit OFFSET :offset''';
   }
 
   static const _title = '''
-SELECT title_id, type, name, synopsis, release_year, runtime_min, num_seasons,
-        num_episodes, poster_url, avg_rating, rating_count
+SELECT title_id, type, name, original_name, synopsis, release_year,
+        runtime_min, num_seasons, num_episodes, poster_url, backdrop_url,
+        avg_rating, rating_count
 FROM titles WHERE title_id = :id''';
+
+  // How many ratings of each star value (0.5 to 5.0) the title has
+  static const _ratingSpread = '''
+SELECT stars, COUNT(*) AS n FROM ratings WHERE title_id = :id GROUP BY stars''';
 
   static const _genres = '''
 SELECT g.name
@@ -115,6 +117,14 @@ SELECT mood_voter_count FROM titles WHERE title_id = :id''';
     final genres = await _db.execute(_genres, params);
     final credits = await _db.execute(_credits, params);
 
+    // 10 bars: 0.5, 1.0, ... 5.0 stars
+    final histogram = List<int>.filled(10, 0);
+    final spread = await _db.execute(_ratingSpread, params);
+    for (final row in spread.rows) {
+      final stars = double.parse(row.colByName('stars')!);
+      histogram[(stars * 2).round() - 1] = int.parse(row.colByName('n')!);
+    }
+
     final people = credits.rows.map(Credit.fromRow).toList();
     return TitleDetails.fromRow(
       title.rows.first,
@@ -124,6 +134,7 @@ SELECT mood_voter_count FROM titles WHERE title_id = :id''';
         ...people.where((c) => c.role == 'cast').take(topCast),
       ],
       moods: (await findMoods(id))!,
+      ratingHistogram: histogram,
     );
   }
 

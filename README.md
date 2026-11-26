@@ -17,7 +17,7 @@ CMPE-137 SJSU, Fall 2026
 - **Home:** "Discovery", a grid of random posters. It reshuffles every time you tap Home, and when you pull down.
 - **Mood tab:** one row of posters per mood (Hopeful, Gloomy, Happy, Melancholy, Calm, Excited), ranked by how well each title fits the mood, not by popularity. Tap a mood's name to open its own page: every title for that mood in a shuffled grid that loads more as you scroll.
 - **Mood themes:** the **Theme** button opens "How are you feeling today?" and recolors the whole app to the chosen mood. The choice is saved on the device.
-- **Title details page:** tap a poster to see its facts, genres, mood tags, community vote results, overview, director or creator, and top cast. Empty fields are hidden.
+- **Title details page** (Letterboxd-style): a wide still fading into the page, with round Back and ⋮ buttons over it; the name, original-language name in italics, year, director or creator, and length beside the poster (tap the poster to open it full screen, then pinch or double-tap to zoom); the overview; mood tags; a **Ratings** chart (a bar per half star, the average and the count); then community mood votes, cast and genres. ⋮ → **Add to a list** adds the title to the end of one of your lists. Empty fields are hidden.
 - **Search:**
   - Find movies and shows by title, director, creator or cast. Results appear as you type, and more load as you scroll.
   - Each result shows its poster, year and Movie/TV.
@@ -78,13 +78,14 @@ CMPE137Project/
 │   │   │   └── models.dart             Mood, TitleCard, TitleDetails, UserListSummary/Details, Profile, ...
 │   │   ├── auth/
 │   │   │   ├── auth_controller.dart    who is logged in; saves the session on the device
+│   │   │   ├── auth_scope.dart         lets any page find who is logged in (e.g. the details page's ⋮ menu)
 │   │   │   └── validators.dart         email, username and password checks (same rules as the server)
 │   │   ├── screens/
 │   │   │   ├── app_shell.dart          the tabs, each with its own page history, and the nav bar
 │   │   │   ├── home_screen.dart        Home: theme button and the Discovery grid
 │   │   │   ├── mood_screen.dart        Mood tab: one row per mood
 │   │   │   ├── mood_titles_screen.dart one mood's page: shuffled grid, loads more on scroll
-│   │   │   ├── title_details_screen.dart  details page: facts, mood tags, vote bars, cast
+│   │   │   ├── title_details_screen.dart  details page: backdrop, header, poster zoom, Ratings, ⋮ Add to a list
 │   │   │   ├── search_screen.dart      Search tab; also "pick a title" mode for lists and GOAT
 │   │   │   ├── profile_screen.dart     Profile tab: the 4 tabs, profile view, Greatest Of All Time
 │   │   │   ├── profile_settings_screen.dart  Profile Settings: photo, name, email, bio, pronoun, Sign out
@@ -117,7 +118,8 @@ CMPE137Project/
 │   │   ├── search_test.dart            search results, paging, no results, errors
 │   │   ├── mood_titles_test.dart       one mood's page: grid, paging, Back
 │   │   ├── list_test.dart              making, editing, reordering and deleting lists
-│   │   └── profile_test.dart           profile view, Greatest Of All Time, Profile Settings
+│   │   ├── profile_test.dart           profile view, Greatest Of All Time, Profile Settings
+│   │   └── details_page_test.dart      details page layout, Ratings, poster zoom, Add to a list
 │   ├── android/app/src/debug/AndroidManifest.xml
 │   │                                   lets the emulator use http:// in debug builds
 │   ├── ios/Runner/Info.plist           includes the photo library permission text (iOS only)
@@ -141,7 +143,8 @@ CMPE137Project/
     │   ├── schema.sql                  all tables, views and the vote procedure
     │   ├── seed_moods.sql              the 6 moods and genre-to-mood mappings
     │   ├── update_vote_rule.sql        switches an older database to the vote-count rules
-    │   └── update_profile.sql          adds pronoun + Greatest Of All Time to an existing database
+    │   ├── update_profile.sql          adds pronoun + Greatest Of All Time to an existing database
+    │   └── update_details.sql          adds backdrop + original name to an existing database
     ├── lib/
     │   ├── db.dart                     MySQL connection pool
     │   ├── auth/
@@ -246,8 +249,11 @@ You're done when http://localhost:8080/health shows:
 |---|---|---|
 | `db/update_vote_rule.sql` | your database is from before November 18 | `SHOW COLUMNS FROM title_moods LIKE 'is_confirmed';` returns a row |
 | `db/update_profile.sql` | your database is from before November 25 (profile page) | `SHOW TABLES LIKE 'goat_picks';` returns nothing |
+| `db/update_details.sql` | your database is from before November 26 (new details page) | `SHOW COLUMNS FROM titles LIKE 'backdrop_url';` returns nothing |
 
 Lists need no update script; they use the `watchlists` tables that were already there.
+
+After `update_details.sql`, run the importer again (`dart run bin/import_tmdb.dart`) so the titles you already have get their backdrop and original-language name. It updates titles in place and keeps votes, lists and accounts.
 
 After pulling server changes, **restart `dart_frog dev`** (Ctrl+C, then run it again). New routes, and the `public/` folder for photos, are only picked up when it starts.
 

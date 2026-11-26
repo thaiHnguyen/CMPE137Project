@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../api/api_client.dart';
 import '../auth/auth_controller.dart';
+import '../auth/auth_scope.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/leave_guard.dart';
 import '../widgets/nav_bar.dart';
@@ -109,22 +110,25 @@ class _AppShellState extends State<AppShell> {
         if (!didPop) _onBack();
       },
       child: Scaffold(
-        body: LeaveGuardScope(
-          guard: _leaveGuard,
-          child: IndexedStack(
-            index: _current,
-            children: [
-              for (var i = 0; i < navTabs.length; i++)
-                _TabEntrance(
-                  active: i == _current,
-                  child: Navigator(
-                    key: _navigators[i],
-                    onGenerateRoute: (_) => MaterialPageRoute<void>(
-                      builder: (_) => _rootPage(i),
+        body: AuthScope(
+          auth: widget.auth,
+          child: LeaveGuardScope(
+            guard: _leaveGuard,
+            child: IndexedStack(
+              index: _current,
+              children: [
+                for (var i = 0; i < navTabs.length; i++)
+                  _TabEntrance(
+                    active: i == _current,
+                    child: Navigator(
+                      key: _navigators[i],
+                      onGenerateRoute: (_) => MaterialPageRoute<void>(
+                        builder: (_) => _rootPage(i),
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
         bottomNavigationBar: NoiReelNavBar(

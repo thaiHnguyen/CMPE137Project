@@ -125,12 +125,14 @@ CREATE TABLE titles (
   tmdb_id      INT UNSIGNED NULL,                    -- NULL for admin-created entries
   type         ENUM('movie','tv') NOT NULL,
   name         VARCHAR(255) NOT NULL,
+  original_name VARCHAR(255) NULL,                  -- title in its own language, only if different languages
   synopsis     TEXT NULL,
   release_year SMALLINT UNSIGNED NULL,
   runtime_min  SMALLINT UNSIGNED NULL,               -- movies
   num_seasons  SMALLINT UNSIGNED NULL,               -- TV
   num_episodes SMALLINT UNSIGNED NULL,               -- TV
   poster_url   VARCHAR(500) NULL,                    -- NULL -> placeholder (GU-02.03)
+  backdrop_url VARCHAR(500) NULL,                    -- wide still shown behind the details page header
   popularity   DECIMAL(10,3) NOT NULL DEFAULT 0,     -- TMDB trend score; tie-breaker only, never the main sort
   tmdb_vote_avg   DECIMAL(3,1) NULL,                 -- TMDB 0-10 score, used as a quality floor in mood rows
   tmdb_vote_count INT UNSIGNED NOT NULL DEFAULT 0,

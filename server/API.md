@@ -52,8 +52,10 @@ Title details:
 ```json
 {
   "titleId": 4, "type": "movie", "name": "Example", "year": 2020, "posterUrl": null,
+  "originalName": "例", "backdropUrl": "https://image.tmdb.org/t/p/w1280/....jpg",
   "synopsis": "...", "runtimeMin": 120, "seasons": null, "episodes": null,
   "avgRating": 4.5, "ratingCount": 12,
+  "ratingHistogram": [0, 0, 0, 1, 0, 2, 1, 3, 2, 3],
   "genres": ["Drama"],
   "directors": [{"personId": 1, "name": "..."}],
   "creators": [],
@@ -78,6 +80,7 @@ Rules:
 - **Mood rows:** ranked by mood fit (`mood_score`). TMDB rating, then popularity, only break ties. `mood_score` is genre fit + votes + admin curation. Titles with 1-199 TMDB votes are left out unless users voted the mood or an admin curated it.
 - **Mood tags:** the mood with the most votes is `primary`, then `secondary` in order of votes, up to 5 tags in total. Every vote counts right away. Moods nobody voted for yet come after the voted ones, ordered by genre fit, so before anyone votes all tags come from the title's genres (0 votes). Ties in votes go to the better genre fit. `voters` is how many different users voted any mood on the title.
 - **Vote results:** `votes` is the Fragrantica-style results panel: every mood with at least one vote, in the same order as the tags.
+- **Details page extras:** `originalName` is the title in its own language, only when it differs from `name` (otherwise `null`). `backdropUrl` is a wide still for behind the header, or `null`. `ratingHistogram` always has 10 counts, for 0.5, 1.0, ... 5.0 stars, in that order. Both new fields are filled by the TMDB importer.
 - **Discover:** random titles for the home page's Discovery grid, different on every call. Only titles with a poster and at least 200 TMDB votes (or no TMDB score at all, e.g. added by an admin). `limit` is 1-60, default 30.
 - **Search:** matches part of a title, director, creator or cast name, ignoring case. Results go exact title, title starts with the keyword, title contains it, then person match. The keyword is 1-100 characters. For `total: 0`, show "No results" and a suggestion to broaden the search (GU-02.04).
 - **Shuffled mood page:** `GET /moods/:id/titles?shuffle=<number>` returns the same titles in a random order. The same number always gives the same order, so keep it while loading more pages (no repeats) and send a new one to reshuffle. The number is 1-2147483647.

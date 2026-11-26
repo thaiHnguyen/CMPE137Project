@@ -32,6 +32,7 @@ import 'package:server/db.dart';
 
 const _apiBase = 'https://api.themoviedb.org/3';
 const _posterBase = 'https://image.tmdb.org/t/p/w500';
+const _backdropBase = 'https://image.tmdb.org/t/p/w1280';
 const _topCast = 10; // GU-03.02
 
 // Fewest TMDB votes for a title to count as "best-rated" in a genre.
@@ -242,6 +243,15 @@ Future<void> _importTitle(String type, int tmdbId,
       ? _positive(episodeTimes.isEmpty ? null : episodeTimes.first)
       : _positive(d['runtime']);
   final poster = d['poster_path'] as String?;
+  final backdrop = d['backdrop_path'] as String?;
+  final name = (isTv ? d['name'] : d['title']) as String;
+  // The title in its own language, kept only when it's different
+  final original =
+      _clip((isTv ? d['original_name'] : d['original_title']) as String?, 255);
+  final originalName =
+      original == null || original.toLowerCase() == name.toLowerCase()
+          ? null
+          : original;
   final voteAvg = (d['vote_average'] as num?)?.toDouble();
   final voteCount = (d['vote_count'] as int?) ?? 0;
 
@@ -271,24 +281,28 @@ Future<void> _importTitle(String type, int tmdbId,
 
   await db.transactional((MySQLConnection conn) async {
     final res = await conn.execute(
-      'INSERT INTO titles (tmdb_id, type, name, synopsis, release_year, '
-      'runtime_min, num_seasons, num_episodes, poster_url, popularity, '
-      'tmdb_vote_avg, tmdb_vote_count) '
-      'VALUES (:tmdb, :type, :name, :synopsis, :year, :runtime, :seasons, '
-      ':episodes, :poster, :pop, :vote_avg, :vote_count) '
+      'INSERT INTO titles (tmdb_id, type, name, original_name, synopsis, '
+      'release_year, runtime_min, num_seasons, num_episodes, poster_url, '
+      'backdrop_url, popularity, tmdb_vote_avg, tmdb_vote_count) '
+      'VALUES (:tmdb, :type, :name, :original, :synopsis, :year, :runtime, '
+      ':seasons, :episodes, :poster, :backdrop, :pop, :vote_avg, '
+      ':vote_count) '
       'ON DUPLICATE KEY UPDATE title_id = LAST_INSERT_ID(title_id), '
-      'name = VALUES(name), synopsis = VALUES(synopsis), '
+      'name = VALUES(name), original_name = VALUES(original_name), '
+      'synopsis = VALUES(synopsis), '
       'release_year = VALUES(release_year), '
       'runtime_min = VALUES(runtime_min), '
       'num_seasons = VALUES(num_seasons), '
       'num_episodes = VALUES(num_episodes), '
-      'poster_url = VALUES(poster_url), popularity = VALUES(popularity), '
+      'poster_url = VALUES(poster_url), backdrop_url = VALUES(backdrop_url), '
+      'popularity = VALUES(popularity), '
       'tmdb_vote_avg = VALUES(tmdb_vote_avg), '
       'tmdb_vote_count = VALUES(tmdb_vote_count)',
       {
         'tmdb': tmdbId,
         'type': type,
-        'name': (isTv ? d['name'] : d['title']) as String,
+        'name': name,
+        'original': originalName,
         'synopsis': (d['overview'] as String?)?.trim().isEmpty ?? true
             ? null
             : d['overview'],
@@ -297,6 +311,7 @@ Future<void> _importTitle(String type, int tmdbId,
         'seasons': isTv ? _positive(d['number_of_seasons']) : null,
         'episodes': isTv ? _positive(d['number_of_episodes']) : null,
         'poster': poster == null ? null : '$_posterBase$poster',
+        'backdrop': backdrop == null ? null : '$_backdropBase$backdrop',
         'pop': (d['popularity'] as num?)?.toDouble() ?? 0,
         // No votes means no real score, so store NULL rather than 0.0
         'vote_avg': voteCount == 0 || voteAvg == null
