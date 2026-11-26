@@ -11,137 +11,72 @@ import 'login_screen.dart';
 import 'new_list_screen.dart';
 import 'register_screen.dart';
 
-/// The Lists tab: Favorite, List and Watchlist along the top.
-///
-/// List shows the user's own lists, with a + button above the nav bar to
-/// make a new one. Favorite and Watchlist come later
-class ListsScreen extends StatefulWidget {
-  /// Creates the Lists tab
-  const ListsScreen({super.key, required this.api, required this.auth});
+// Pieces of the Profile tab's Favorite, List and Watchlist tabs (they
+// used to be their own Lists tab in the nav bar).
+//
+// MyListsView shows the user's lists; startNewList is what the + button
+// does; ListsComingSoon fills Favorite and Watchlist for now
 
-  final ApiClient api;        // Connection to the server
-  final AuthController auth;  // Who is logged in
+/// The + button: a guest is asked to sign in, an admin is told admins
+/// can't have lists, and anyone else gets the New List page. A list made
+/// there bumps [reload] so [MyListsView] shows it
+Future<void> startNewList(
+  BuildContext context, {
+  required ApiClient api,
+  required AuthController auth,
+  required ValueNotifier<int> reload,
+}) async {
+  final navigator = Navigator.of(context);
+  final messenger = ScaffoldMessenger.of(context);
 
-  @override
-  State<ListsScreen> createState() => _ListsScreenState();
-}
-
-class _ListsScreenState extends State<ListsScreen>
-    with SingleTickerProviderStateMixin {
-  /// Tab order along the top
-  static const _tabs = ['Favorite', 'List', 'Watchlist'];
-  static const _listTab = 1;
-
-  late final _tabController = TabController(
-    length: _tabs.length,
-    initialIndex: _listTab,
-    vsync: this,
-  )..addListener(() => setState(() {})); // shows or hides the + button
-
-  // Bumped to reload the user's lists, e.g. after making one
-  final _reload = ValueNotifier<int>(0);
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    _reload.dispose();
-    super.dispose();
-  }
-
-  Future<void> _newList() async {
-    if (!widget.auth.isLoggedIn) {
-      final choice = await askGuestToSignIn(context, 'to create a list');
-      if (choice == null || !mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => choice == GuestChoice.signIn
-              ? LoginScreen(auth: widget.auth)
-              : RegisterScreen(auth: widget.auth),
-        ),
-      );
-      return;
-    }
-    if (widget.auth.value!.isAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Admin accounts can't have lists.")),
-      );
-      return;
-    }
-
-    final created = await Navigator.of(context).push<UserListDetails>(
-      MaterialPageRoute(
-        builder: (_) => NewListScreen(api: widget.api, auth: widget.auth),
+  if (!auth.isLoggedIn) {
+    final choice = await askGuestToSignIn(context, 'to create a list');
+    if (choice == null) return;
+    navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => choice == GuestChoice.signIn
+            ? LoginScreen(auth: auth)
+            : RegisterScreen(auth: auth),
       ),
     );
-    if (created == null || !mounted) return;
-    _reload.value++;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('"${created.name}" created.')));
+    return;
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('NOIREEL'),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: colors.onSecondary,
-          unselectedLabelColor: colors.onSecondary.withValues(alpha: 0.6),
-          indicatorColor: colors.onSecondary,
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w900),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-          dividerColor: Colors.transparent,
-          tabs: [for (final t in _tabs) Tab(text: t)],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          const _ComingSoon(
-            icon: Icons.favorite_outline,
-            text: 'Titles you add to your favorites will show up here.',
-          ),
-          _MyLists(api: widget.api, auth: widget.auth, reload: _reload),
-          const _ComingSoon(
-            icon: Icons.bookmark_outline,
-            text: 'Titles you add to your watchlist will show up here.',
-          ),
-        ],
-      ),
-      // The + sits in the middle, just above the nav bar
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _tabController.index == _listTab
-          ? FloatingActionButton.small(
-              tooltip: 'New list',
-              onPressed: _newList,
-              backgroundColor: colors.primary,
-              foregroundColor: colors.onPrimary,
-              shape: const CircleBorder(),
-              child: const Icon(Icons.add),
-            )
-          : null,
+  if (auth.value!.isAdmin) {
+    messenger.showSnackBar(
+      const SnackBar(content: Text("Admin accounts can't have lists.")),
     );
+    return;
   }
+
+  final created = await navigator.push<UserListDetails>(
+    MaterialPageRoute(builder: (_) => NewListScreen(api: api, auth: auth)),
+  );
+  if (created == null) return;
+  reload.value++;
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text('"${created.name}" created.')));
 }
 
 /// The List tab: the user's lists, or a sign-in note for a guest
-class _MyLists extends StatefulWidget {
-  const _MyLists({required this.api, required this.auth, required this.reload});
+class MyListsView extends StatefulWidget {
+  /// Creates the List tab's contents
+  const MyListsView({
+    super.key,
+    required this.api,
+    required this.auth,
+    required this.reload,
+  });
 
   final ApiClient api;
   final AuthController auth;
   final ValueNotifier<int> reload; // Changes when the lists should reload
 
   @override
-  State<_MyLists> createState() => _MyListsState();
+  State<MyListsView> createState() => _MyListsViewState();
 }
 
-class _MyListsState extends State<_MyLists> {
+class _MyListsViewState extends State<MyListsView> {
   Future<List<UserListSummary>>? _lists;
   String? _token; // Whose lists are loaded
 
@@ -178,18 +113,26 @@ class _MyListsState extends State<_MyLists> {
     await _lists?.catchError((_) => <UserListSummary>[]);
   }
 
-  void _open(UserListSummary list) {
+  Future<void> _open(UserListSummary list) async {
     final token = _token;
     if (token == null) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    final change = await Navigator.of(context).push<ListChange>(
+      MaterialPageRoute(
         builder: (_) => ListDetailScreen(
           api: widget.api,
+          auth: widget.auth,
           token: token,
           summary: list,
         ),
       ),
     );
+    if (change == null || !mounted) return;
+    _load(); // new name, order or posters, or one list fewer
+    if (change == ListChange.deleted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('"${list.name}" deleted.')));
+    }
   }
 
   @override
@@ -333,8 +276,10 @@ class _ListCard extends StatelessWidget {
   }
 }
 
-class _ComingSoon extends StatelessWidget {
-  const _ComingSoon({required this.icon, required this.text});
+/// Placeholder for the Favorite and Watchlist tabs
+class ListsComingSoon extends StatelessWidget {
+  /// Creates the placeholder
+  const ListsComingSoon({super.key, required this.icon, required this.text});
 
   final IconData icon;
   final String text;

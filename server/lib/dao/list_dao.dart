@@ -53,6 +53,25 @@ VALUES (:user, :name, :description, 'private', FALSE)''';
 INSERT INTO watchlist_items (watchlist_id, title_id, position)
 VALUES (:list, :title, :position)''';
 
+  // Locks the list row so two saves of the same list run one at a time
+  static const _lockList = '''
+SELECT watchlist_id FROM watchlists
+WHERE watchlist_id = :list AND user_id = :user AND NOT is_default
+FOR UPDATE''';
+
+  // updated_at is set by hand so reordering alone still counts as a change
+  static const _updateList = '''
+UPDATE watchlists
+SET name = :name, description = :description, updated_at = NOW()
+WHERE watchlist_id = :list''';
+
+  static const _clearEntries =
+      'DELETE FROM watchlist_items WHERE watchlist_id = :list';
+
+  static const _deleteList = '''
+DELETE FROM watchlists
+WHERE watchlist_id = :list AND user_id = :user AND NOT is_default''';
+
   /// The user's lists, most recently changed first
   Future<List<UserListSummary>> myLists(int userId) async {
     final res = await _db.execute(_myLists, {'user': userId});
@@ -114,5 +133,49 @@ VALUES (:list, :title, :position)''';
       }
       return listId;
     });
+  }
+
+  /// Replaces a list's name, description and entries (in the
+  /// given order), all or nothing. 
+  /// Returns false if the list doesn't exist or isn't the user's
+  Future<bool> update({
+    required int userId,
+    required int listId,
+    required String name,
+    required String? description,
+    required List<int> titleIds,
+  }) {
+    return _db.transactional((MySQLConnection conn) async {
+      final mine = await conn.execute(_lockList, {
+        'list': listId,
+        'user': userId,
+      });
+      if (mine.rows.isEmpty) return false;
+
+      await conn.execute(_updateList, {
+        'list': listId,
+        'name': name,
+        'description': description,
+      });
+      await conn.execute(_clearEntries, {'list': listId});
+      for (final (i, titleId) in titleIds.indexed) {
+        await conn.execute(_insertEntry, {
+          'list': listId,
+          'title': titleId,
+          'position': i + 1,
+        });
+      }
+      return true;
+    });
+  }
+
+  /// Deletes one of the user's lists and its entries (ON DELETE
+  /// CASCADE). Returns false if it doesn't exist or isn't the user's
+  Future<bool> delete(int userId, int listId) async {
+    final res = await _db.execute(_deleteList, {
+      'list': listId,
+      'user': userId,
+    });
+    return res.affectedRows.toInt() > 0;
   }
 }

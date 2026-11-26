@@ -52,7 +52,7 @@ void main() {
     int? tapped;
     await tester.pumpWidget(barApp(current: 0, onTap: (i) => tapped = i));
 
-    await tester.tap(find.byIcon(Icons.bookmarks_outlined)); // Lists
+    await tester.tap(find.byIcon(Icons.explore_outlined)); // Pick for me
     expect(tapped, 3);
   });
 

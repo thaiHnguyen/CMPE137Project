@@ -32,9 +32,9 @@ DROP PROCEDURE IF EXISTS refresh_title_moods;
 
 DROP TABLE IF EXISTS engagement_events, moderation_actions, reports,
   collection_items, collections, seed_moods, seed_titles, not_interested,
-  watch_logs, watchlist_items, watchlists, reviews, ratings, private_tags,
-  user_mood_tags, title_moods, genre_moods, mood_counters, moods,
-  title_credits, people, title_genres, genres, titles,
+  goat_picks, watch_logs, watchlist_items, watchlists, reviews, ratings,
+  private_tags, user_mood_tags, title_moods, genre_moods, mood_counters,
+  moods, title_credits, people, title_genres, genres, titles,
   password_resets, sessions, admins, registered_users, user_accounts;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -53,6 +53,7 @@ CREATE TABLE user_accounts (
   locked_until       DATETIME     NULL,              -- 15 min after 5 failures
   display_name       VARCHAR(50)  NULL,
   bio                VARCHAR(160) NULL,              -- RU-13.01
+  pronoun            VARCHAR(20)  NULL,              -- shown on the profile, e.g. 'he/him'
   avatar_url         VARCHAR(500) NULL,
   profile_visibility ENUM('public','private') NOT NULL DEFAULT 'public',
   created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -338,6 +339,20 @@ CREATE TABLE watchlist_items (
   KEY idx_wli_order (watchlist_id, position),
   CONSTRAINT fk_wli_list  FOREIGN KEY (watchlist_id) REFERENCES watchlists (watchlist_id) ON DELETE CASCADE,
   CONSTRAINT fk_wli_title FOREIGN KEY (title_id)     REFERENCES titles (title_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Greatest Of All Time: up to 5 titles pinned to the top of a profile,
+-- in slots 1-5
+CREATE TABLE goat_picks (
+  user_id   BIGINT UNSIGNED  NOT NULL,
+  slot      TINYINT UNSIGNED NOT NULL,              -- 1-5, left to right
+  title_id  BIGINT UNSIGNED  NOT NULL,
+  PRIMARY KEY (user_id, slot),
+  UNIQUE KEY uq_goat_title (user_id, title_id),     -- a title fills one slot at most
+  KEY idx_goat_title (title_id),
+  CONSTRAINT chk_goat_slot  CHECK (slot BETWEEN 1 AND 5),
+  CONSTRAINT fk_goat_user  FOREIGN KEY (user_id)  REFERENCES user_accounts (user_id) ON DELETE CASCADE,
+  CONSTRAINT fk_goat_title FOREIGN KEY (title_id) REFERENCES titles (title_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE watch_logs (

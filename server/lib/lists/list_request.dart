@@ -1,10 +1,11 @@
 import 'package:server/dao/list_dao.dart';
 
-/// A checked "create list" request: trimmed name and description, and the
-/// title ids with duplicates removed (first one kept, so order is kept)
+/// A checked "create list" or "save list" request: trimmed name and
+/// description, and the title ids with duplicates removed (first one kept,
+/// so order is kept)
 typedef NewList = ({String name, String? description, List<int> titleIds});
 
-/// The problem with a "create list" body, for a 400 response
+/// The problem with a list body, for a 400 response
 typedef ListProblem = ({String field, String message});
 
 /// Longest list name (watchlists.name is VARCHAR(60))
@@ -13,7 +14,8 @@ const maxListName = 60;
 /// Longest description (watchlists.description is VARCHAR(500))
 const maxListDescription = 500;
 
-/// Checks a `POST /me/lists` body. Returns the list, or the problem
+/// Checks a `POST /me/lists` or `PUT /me/lists/:id` body. Returns the
+/// list, or the problem
 (NewList?, ListProblem?) parseNewList(Map<String, dynamic> body) {
   final name = body['name'] is String ? (body['name'] as String).trim() : '';
   if (name.isEmpty) {

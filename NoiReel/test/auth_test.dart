@@ -64,6 +64,20 @@ class FakeServer {
         });
       case 'POST /auth/logout':
         return http.Response('', 204);
+      case 'GET /me/profile':
+        return json(200, {
+          'profile': {
+            'userId': 1,
+            'username': 'thai',
+            'email': 'thai@example.com',
+            'role': 'user',
+            'displayName': null,
+            'bio': null,
+            'pronoun': null,
+            'avatarUrl': null,
+            'goat': [null, null, null, null, null],
+          },
+        });
     }
     return http.Response('Route not found', 404);
   });
@@ -197,11 +211,12 @@ void main() {
 
   group('Profile tab', () {
     Future<AuthController> pumpProfile(WidgetTester tester) async {
-      final auth = AuthController(FakeServer().api);
+      final api = FakeServer().api;
+      final auth = AuthController(api);
       await tester.pumpWidget(
         MaterialApp(
           theme: NoiReelPalette.defaultTheme.toThemeData(),
-          home: ProfileScreen(auth: auth),
+          home: ProfileScreen(api: api, auth: auth),
         ),
       );
       await tester.pumpAndSettle();
@@ -222,7 +237,10 @@ void main() {
       expect(find.text('@thai'), findsOneWidget); // back on Profile
       expect(auth.isLoggedIn, isTrue);
 
-      await tester.tap(find.text('Log out'));
+      // Signing out lives in Settings now
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sign out'));
       await tester.pumpAndSettle();
       expect(find.text('Join NoiReel'), findsOneWidget);
     });

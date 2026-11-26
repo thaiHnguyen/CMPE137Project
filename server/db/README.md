@@ -38,7 +38,7 @@ CREATE DATABASE noireel;
 
 Click refresh in the Schemas panel. `noireel` should appear.
 
-Then create the tables: double-click `noireel` to make it the default schema, open `server/db/schema.sql` (File → Open SQL Script), and run it with the lightning-bolt button. Refresh again; `noireel` should now have 29 tables.
+Then create the tables: double-click `noireel` to make it the default schema, open `server/db/schema.sql` (File → Open SQL Script), and run it with the lightning-bolt button. Refresh again; `noireel` should now have 30 tables.
 
 > Re-running `schema.sql` drops and recreates every table, so any local data is wiped. That's fine during development.
 

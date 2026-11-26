@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -135,6 +136,103 @@ class ApiClient {
     return UserListDetails.fromJson(json['list'] as Map<String, dynamic>);
   }
 
+  /// `PUT /me/lists/:id`: saves an edit. Replaces the name, description
+  /// and entries, with [titleIds] in their new order. A rejected field
+  /// comes back as an [ApiException] with [ApiException.field]
+  Future<UserListDetails> updateList(
+    String token,
+    int listId, {
+    required String name,
+    String? description,
+    required List<int> titleIds,
+  }) async {
+    final json = await _send(
+      'PUT',
+      '/me/lists/$listId',
+      token: token,
+      body: {
+        'name': name,
+        'description': description,
+        'titleIds': titleIds,
+      },
+    );
+    return UserListDetails.fromJson(json['list'] as Map<String, dynamic>);
+  }
+
+  /// `DELETE /me/lists/:id`: deletes the list and its entries
+  Future<void> deleteList(String token, int listId) =>
+      _send('DELETE', '/me/lists/$listId', token: token);
+
+  /// Full address of a file the server hosts, such as an avatar path
+  /// (`/avatars/7-123.jpg`). Full URLs are returned as they are
+  String mediaUrl(String path) =>
+      path.startsWith('http') ? path : '$baseUrl$path';
+
+  /// `GET /me/profile`: the logged-in user's profile
+  Future<Profile> getProfile(String token) async {
+    final json = await _send('GET', '/me/profile', token: token);
+    return Profile.fromJson(json['profile'] as Map<String, dynamic>);
+  }
+
+  /// `PUT /me/profile`: saves Profile Settings. A blank name or bio clears
+  /// it. A rejected field comes back as an [ApiException] with
+  /// [ApiException.field]; a taken email is a 409
+  Future<Profile> updateProfile(
+    String token, {
+    String? displayName,
+    String? bio,
+    String? pronoun,
+    required String email,
+  }) async {
+    final json = await _send(
+      'PUT',
+      '/me/profile',
+      token: token,
+      body: {
+        'displayName': displayName,
+        'bio': bio,
+        'pronoun': pronoun,
+        'email': email,
+      },
+    );
+    return Profile.fromJson(json['profile'] as Map<String, dynamic>);
+  }
+
+  /// `PUT /me/profile/goat`: saves all 5 Greatest Of All Time slots, left
+  /// to right (null for an empty slot)
+  Future<Profile> setGoat(String token, List<int?> titleIds) async {
+    final json = await _send(
+      'PUT',
+      '/me/profile/goat',
+      token: token,
+      body: {'titleIds': titleIds},
+    );
+    return Profile.fromJson(json['profile'] as Map<String, dynamic>);
+  }
+
+  /// `POST /me/profile/avatar`: uploads a new profile photo (JPEG, PNG or
+  /// WebP, up to 5 MB)
+  Future<Profile> uploadAvatar(
+    String token,
+    Uint8List bytes, {
+    String filename = 'avatar.jpg',
+  }) async {
+    final request =
+        http.MultipartRequest('POST', Uri.parse('$baseUrl/me/profile/avatar'))
+          ..headers['Authorization'] = 'Bearer $token'
+          ..files.add(
+            http.MultipartFile.fromBytes('avatar', bytes, filename: filename),
+          );
+    final json = await _dispatch(request);
+    return Profile.fromJson(json['profile'] as Map<String, dynamic>);
+  }
+
+  /// `DELETE /me/profile/avatar`: back to the default picture
+  Future<Profile> removeAvatar(String token) async {
+    final json = await _send('DELETE', '/me/profile/avatar', token: token);
+    return Profile.fromJson(json['profile'] as Map<String, dynamic>);
+  }
+
   /// `POST /auth/register`: creates an account and logs it in (GU-07).
   /// A rejected field comes back as an [ApiException] with [ApiException.field]
   Future<AuthResult> register({
@@ -202,7 +300,11 @@ class ApiClient {
       request.body = jsonEncode(body);
     }
     if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    return _dispatch(request);
+  }
 
+  /// Sends [request] and returns its JSON, or throws an [ApiException]
+  Future<Map<String, dynamic>> _dispatch(http.BaseRequest request) async {
     final http.Response res;
     try {
       res = await http.Response.fromStream(

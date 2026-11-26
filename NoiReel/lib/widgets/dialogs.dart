@@ -24,6 +24,30 @@ Future<bool> confirmDiscard(BuildContext context) async {
   return discard ?? false;
 }
 
+/// "Delete the list?" with Delete, and Cancel. Returns true for Delete.
+/// Tapping outside the box counts as Cancel
+Future<bool> confirmDeleteList(BuildContext context, String name) async {
+  final delete = await showDialog<bool>(
+    context: context,
+    builder: (context) => _NoiReelDialog(
+      title: 'Delete the list?',
+      message: '"$name" and its entries will be gone for good.',
+      actions: [
+        _DialogButton(
+          label: 'Delete',
+          primary: true,
+          onPressed: () => Navigator.pop(context, true),
+        ),
+        _DialogButton(
+          label: 'Cancel',
+          onPressed: () => Navigator.pop(context, false),
+        ),
+      ],
+    ),
+  );
+  return delete ?? false;
+}
+
 /// What a guest chose in [askGuestToSignIn]
 enum GuestChoice {
   /// Open the Log in page
@@ -164,6 +188,28 @@ class BackTextButton extends StatelessWidget {
         foregroundColor: Theme.of(context).colorScheme.onSecondary,
         textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
       ),
+    );
+  }
+}
+
+/// "Cancel" for the top left of an app bar, e.g. while editing a list.
+/// Uses maybePop, so unsaved changes ask "Discard changes?" first
+class CancelTextButton extends StatelessWidget {
+  /// Creates the button
+  const CancelTextButton({super.key});
+
+  /// Width to give the app bar's leading slot
+  static const width = 96.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: () => Navigator.of(context).maybePop(),
+      style: TextButton.styleFrom(
+        foregroundColor: Theme.of(context).colorScheme.onSecondary,
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+      ),
+      child: const Text('Cancel'),
     );
   }
 }

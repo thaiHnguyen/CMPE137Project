@@ -118,6 +118,8 @@ Needs a logged-in registered user (`Authorization: Bearer <token>`). Lists are p
 | `GET /me/lists` | none | `200 {lists: [ListSummary]}` | `401` · `403` (admin) |
 | `POST /me/lists` | `{name, description?, titleIds: [int]}` | `201 {list: ListDetails}` | `400 {error:"invalid", field, message}` · `401` · `403` |
 | `GET /me/lists/:id` | none | `200 {list: ListDetails}` | `401` · `404 {error:"not_found"}` |
+| `PUT /me/lists/:id` | `{name, description?, titleIds: [int]}` | `200 {list: ListDetails}` | `400` · `401` · `404` |
+| `DELETE /me/lists/:id` | none | `204` | `401` · `404` |
 
 ```
 ListSummary {listId, name, description, entryCount, posterUrls: [string], updatedAt}
@@ -128,3 +130,28 @@ ListDetails {listId, name, description, entryCount, entries: [TitleCard]}
 - `titleIds`: the entries **in the order they were added**, up to 500. Duplicates are dropped (the first one is kept). Unknown ids give a `400` naming them.
 - `entries` come back in that same order. `posterUrls` holds the first 4 posters, for the list's card.
 - Lists are sorted most recently changed first.
+- `PUT` saves an edit. It replaces the whole list: name, description and entries in the order sent, so reordering or removing entries is just sending the new order. Same checks as `POST`.
+- `DELETE` removes the list and its entries. Someone else's list gives `404`, same as a missing one.
+
+## Your profile
+
+Needs a logged-in user (`Authorization: Bearer <token>`, else `401`). Works for admins too.
+
+| Method & path | Body | Success | Errors |
+|---|---|---|---|
+| `GET /me/profile` | none | `200 {profile: Profile}` | `401` |
+| `PUT /me/profile` | `{displayName?, bio?, pronoun?, email}` | `200 {profile: Profile}` | `400 {error:"invalid", field, message}` · `409 {error:"taken", field:"email"}` |
+| `PUT /me/profile/goat` | `{titleIds: [5 × int or null]}` | `200 {profile: Profile}` | `400 {error:"invalid", field:"titleIds"}` |
+| `POST /me/profile/avatar` | multipart form, file field `avatar` | `200 {profile: Profile}` | `400 {error:"invalid", field:"avatar"}` · `413 {error:"too_large"}` |
+| `DELETE /me/profile/avatar` | none | `200 {profile: Profile}` | `401` |
+
+```
+Profile {userId, username, email, role, displayName, bio, pronoun, avatarUrl,
+         goat: [TitleCard or null, × 5]}
+```
+
+- `displayName`: up to 50 characters, `bio`: up to 160. A blank one clears it (the app then shows the username).
+- `pronoun`: `null` or one of `he/him`, `she/her`, `they/them`, `he/they`, `she/they`, `xe/xem`, `ze/hir`, `it/its`.
+- `email` is required on every save: trimmed, lowercased, and must not belong to another account (`409`). The username can't be changed.
+- `goat` is the Greatest Of All Time: always 5 slots, left to right, `null` for an empty one. Saving sends all 5; a title can fill only one slot. Unknown ids give a `400`.
+- Avatars: JPEG, PNG or WebP, up to 5 MB (checked by the file's contents, not its name). They're saved in `server/public/avatars/` and `avatarUrl` is a path such as `/avatars/7-1764123456789.jpg`, served by Dart Frog from `public/`. Put the server address in front to show it. Changing or removing an avatar deletes the old file.

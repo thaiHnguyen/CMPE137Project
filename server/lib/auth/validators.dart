@@ -15,9 +15,8 @@ FieldError? validateRegistration({
   required String username,
   required String password,
 }) {
-  if (email.length > 254 || !_email.hasMatch(email)) {
-    return (field: 'email', message: 'Enter a valid email address.');
-  }
+  final badEmail = validateEmail(email);
+  if (badEmail != null) return badEmail;
   if (!_username.hasMatch(username)) {
     return (
       field: 'username',
@@ -25,6 +24,14 @@ FieldError? validateRegistration({
     );
   }
   return validatePassword(password);
+}
+
+/// Checks an email address (sign-up and Profile Settings)
+FieldError? validateEmail(String email) {
+  if (email.length > 254 || !_email.hasMatch(email)) {
+    return (field: 'email', message: 'Enter a valid email address.');
+  }
+  return null;
 }
 
 /// Password rule: 8+ characters with at least one letter and one digit.

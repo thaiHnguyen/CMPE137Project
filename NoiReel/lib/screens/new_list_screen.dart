@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../api/api_client.dart';
 import '../api/models.dart';
@@ -10,17 +11,30 @@ import '../widgets/leave_guard.dart';
 import '../widgets/poster_card.dart';
 import 'search_screen.dart';
 
-/// Create a list (RU-08.01): a name, an optional description, and entries
-/// added through search, kept in the order they were added.
+/// Create a list (RU-08.01), or edit one: a name, an optional
+/// description, and entries added through search, kept in the order they
+/// were added. Holding a poster for [holdToDrag] picks it up so it can be
+/// dragged to a new place.
 ///
-/// Leaving with unsaved changes, through Back or the nav bar, asks
-/// "Discard changes?" first. Returns the new list when Done succeeds
+/// Leaving with unsaved changes, through Back/Cancel or the nav bar, asks
+/// "Discard changes?" first. Returns the saved list when Done succeeds
 class NewListScreen extends StatefulWidget {
-  /// Creates the New List page
-  const NewListScreen({super.key, required this.api, required this.auth});
+  /// Creates the New List page, or the Edit List page for [editing]
+  const NewListScreen({
+    super.key,
+    required this.api,
+    required this.auth,
+    this.editing,
+  });
 
   final ApiClient api;        // Connection to the server
   final AuthController auth;  // The logged-in user (lists need a token)
+
+  /// The list being edited, or null to make a new one
+  final UserListDetails? editing;
+
+  /// How long to hold a poster before it can be dragged
+  static const holdToDrag = Duration(milliseconds: 1500);
 
   /// Longest list name (the server allows 60)
   static const maxName = 60;
@@ -45,15 +59,39 @@ class _NewListScreenState extends State<NewListScreen> {
   LeaveGuard? _guard;
   ModalRoute<Object?>? _route;
 
-  /// True once anything has been typed or added
-  bool get _dirty =>
-      _name.text.trim().isNotEmpty ||
-      _description.trim().isNotEmpty ||
-      _entries.isNotEmpty;
+  bool get _isEditing => widget.editing != null;
+
+  /// True when there's something that would be lost by leaving: anything
+  /// typed or added on a new list, or any change to the list being edited
+  bool get _dirty {
+    final original = widget.editing;
+    if (original == null) {
+      return _name.text.trim().isNotEmpty ||
+          _description.trim().isNotEmpty ||
+          _entries.isNotEmpty;
+    }
+    return _name.text.trim() != original.name ||
+        _description.trim() != (original.description ?? '') ||
+        !_sameOrder(_entries, original.entries);
+  }
+
+  static bool _sameOrder(List<TitleCard> a, List<TitleCard> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+    }
+    return true;
+  }
 
   @override
   void initState() {
     super.initState();
+    final original = widget.editing;
+    if (original != null) {
+      _name.text = original.name;
+      _description = original.description ?? '';
+      _entries.addAll(original.entries);
+    }
     _name.addListener(() => setState(() {})); // updates _dirty for PopScope
   }
 
@@ -148,6 +186,14 @@ class _NewListScreenState extends State<NewListScreen> {
   void _remove(TitleCard title) =>
       setState(() => _entries.removeWhere((e) => e.id == title.id));
 
+  /// While dragging: moves the dragged entry into the hovered spot, and
+  /// the others shift to make room
+  void _moveTo(int draggedId, int index) {
+    final from = _entries.indexWhere((e) => e.id == draggedId);
+    if (from < 0 || from == index) return;
+    setState(() => _entries.insert(index, _entries.removeAt(from)));
+  }
+
   Future<void> _done() async {
     final name = _name.text.trim();
     setState(() {
@@ -162,15 +208,28 @@ class _NewListScreenState extends State<NewListScreen> {
       return;
     }
 
+    final description =
+        _description.trim().isEmpty ? null : _description.trim();
+    final titleIds = [for (final e in _entries) e.id];
+    final editing = widget.editing;
+
     setState(() => _saving = true);
     try {
-      final created = await widget.api.createList(
-        token,
-        name: name,
-        description: _description.trim().isEmpty ? null : _description.trim(),
-        titleIds: [for (final e in _entries) e.id],
-      );
-      if (mounted) _close(created);
+      final saved = editing == null
+          ? await widget.api.createList(
+              token,
+              name: name,
+              description: description,
+              titleIds: titleIds,
+            )
+          : await widget.api.updateList(
+              token,
+              editing.id,
+              name: name,
+              description: description,
+              titleIds: titleIds,
+            );
+      if (mounted) _close(saved);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -200,9 +259,12 @@ class _NewListScreenState extends State<NewListScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          leadingWidth: BackTextButton.width,
-          leading: const BackTextButton(),
-          title: const Text('New List'),
+          leadingWidth:
+              _isEditing ? CancelTextButton.width : BackTextButton.width,
+          leading: _isEditing
+              ? const CancelTextButton()
+              : const BackTextButton(),
+          title: Text(_isEditing ? 'Edit List' : 'New List'),
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -295,19 +357,34 @@ class _NewListScreenState extends State<NewListScreen> {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
+                  if (_entries.length > 1) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Hold a poster to drag it to a new spot.',
+                      style: text.bodySmall,
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     gridDelegate: posterGridDelegate,
                     itemCount: _entries.length,
+                    // Lets a moved poster keep its state instead of
+                    // fading in again at its new spot
+                    findChildIndexCallback: (key) {
+                      final id = (key as ValueKey<int>).value;
+                      final i = _entries.indexWhere((e) => e.id == id);
+                      return i < 0 ? null : i;
+                    },
                     itemBuilder: (context, i) => FadeSlideIn(
                       key: ValueKey(_entries[i].id),
                       distance: 16,
-                      child: _EntryTile(
+                      child: _DraggableEntry(
                         title: _entries[i],
                         position: i + 1,
                         onRemove: () => _remove(_entries[i]),
+                        onHover: (draggedId) => _moveTo(draggedId, i),
                       ),
                     ),
                   ),
@@ -391,6 +468,63 @@ class _FieldBox extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// An entry that can be held for [NewListScreen.holdToDrag], then dragged
+/// onto another entry's spot to move it there
+class _DraggableEntry extends StatelessWidget {
+  const _DraggableEntry({
+    required this.title,
+    required this.position,
+    required this.onRemove,
+    required this.onHover,
+  });
+
+  final TitleCard title;
+  final int position;
+  final VoidCallback onRemove;
+  final ValueChanged<int> onHover; // An entry (by id) is dragged over this
+
+  @override
+  Widget build(BuildContext context) {
+    final tile = _EntryTile(
+      title: title,
+      position: position,
+      onRemove: onRemove,
+    );
+
+    return LayoutBuilder(
+      builder: (context, size) => DragTarget<int>(
+        onWillAcceptWithDetails: (details) {
+          if (details.data != title.id) onHover(details.data);
+          return true;
+        },
+        builder: (context, _, _) => LongPressDraggable<int>(
+          data: title.id,
+          delay: NewListScreen.holdToDrag,
+          hapticFeedbackOnStart: false,
+          onDragStarted: HapticFeedback.mediumImpact,
+          // The picked-up poster, a little bigger, follows the finger
+          feedback: SizedBox(
+            width: size.maxWidth,
+            height: size.maxHeight,
+            child: Transform.scale(
+              scale: 1.08,
+              child: Material(
+                color: Colors.transparent,
+                elevation: 12,
+                borderRadius: BorderRadius.circular(10),
+                child: PosterImage(url: title.posterUrl, type: title.type),
+              ),
+            ),
+          ),
+          // Its spot stays as a faint gap while it's being dragged
+          childWhenDragging: Opacity(opacity: 0.25, child: tile),
+          child: tile,
         ),
       ),
     );
