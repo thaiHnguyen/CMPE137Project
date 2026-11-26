@@ -26,12 +26,25 @@ Future<bool> confirmDiscard(BuildContext context) async {
 
 /// "Delete the list?" with Delete, and Cancel. Returns true for Delete.
 /// Tapping outside the box counts as Cancel
-Future<bool> confirmDeleteList(BuildContext context, String name) async {
+Future<bool> confirmDeleteList(BuildContext context, String name) =>
+    confirmDelete(
+      context,
+      title: 'Delete the list?',
+      message: '"$name" and its entries will be gone for good.',
+    );
+
+/// A [title] and [message] with Delete, and Cancel. Returns true for
+/// Delete. Tapping outside the box counts as Cancel
+Future<bool> confirmDelete(
+  BuildContext context, {
+  required String title,
+  required String message,
+}) async {
   final delete = await showDialog<bool>(
     context: context,
     builder: (context) => _NoiReelDialog(
-      title: 'Delete the list?',
-      message: '"$name" and its entries will be gone for good.',
+      title: title,
+      message: message,
       actions: [
         _DialogButton(
           label: 'Delete',
