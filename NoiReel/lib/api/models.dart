@@ -222,3 +222,59 @@ class SessionInfo {
   final String username;
   final String role; // `user` or `admin`
 }
+
+/// One of the user's lists, as shown on the Lists tab
+class UserListSummary {
+  /// Creates a [UserListSummary]
+  const UserListSummary({
+    required this.id,
+    required this.name,
+    this.description,
+    required this.entryCount,
+    this.posterUrls = const [],
+  });
+
+  /// Reads the server's JSON
+  factory UserListSummary.fromJson(Map<String, dynamic> json) =>
+      UserListSummary(
+        id: json['listId'] as int,
+        name: json['name'] as String,
+        description: json['description'] as String?,
+        entryCount: json['entryCount'] as int,
+        posterUrls: (json['posterUrls'] as List<dynamic>? ?? []).cast<String>(),
+      );
+
+  final int id;                  // `listId`
+  final String name;
+  final String? description;
+  final int entryCount;          // Titles in the list
+  final List<String> posterUrls; // First few posters, for the list's card
+}
+
+/// A list with all its entries, in the order they were added
+class UserListDetails {
+  /// Creates a [UserListDetails]
+  const UserListDetails({
+    required this.id,
+    required this.name,
+    this.description,
+    this.entries = const [],
+  });
+
+  /// Reads the server's JSON
+  factory UserListDetails.fromJson(Map<String, dynamic> json) =>
+      UserListDetails(
+        id: json['listId'] as int,
+        name: json['name'] as String,
+        description: json['description'] as String?,
+        entries: [
+          for (final e in json['entries'] as List<dynamic>)
+            TitleCard.fromJson(e as Map<String, dynamic>),
+        ],
+      );
+
+  final int id;                  // `listId`
+  final String name;
+  final String? description;
+  final List<TitleCard> entries; // In the order they were added
+}

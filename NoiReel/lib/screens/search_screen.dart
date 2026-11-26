@@ -13,9 +13,25 @@ import 'title_details_screen.dart';
 /// load as you scroll
 class SearchScreen extends StatefulWidget {
   /// Creates the Search tab
-  const SearchScreen({super.key, required this.api});
+  const SearchScreen({
+    super.key,
+    required this.api,
+    this.onPick,
+    this.pickedIds = const {},
+    this.appBar,
+  });
 
   final ApiClient api; // Connection to the server
+
+  /// Picking mode (e.g. adding entries to a list): tapping a result calls
+  /// this instead of opening its details page
+  final ValueChanged<TitleCard>? onPick;
+
+  /// In picking mode, titles already picked; they show a check mark
+  final Set<int> pickedIds;
+
+  /// Replaces the usual "NOIREEL" app bar
+  final PreferredSizeWidget? appBar;
 
   /// Wait this long after the last keystroke before searching, so typing
   /// "inception" sends one request, not nine
@@ -149,6 +165,11 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _open(TitleCard title) {
     FocusScope.of(context).unfocus(); // hide the keyboard
+    final onPick = widget.onPick;
+    if (onPick != null) {
+      onPick(title);
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => TitleDetailsScreen(api: widget.api, title: title),
@@ -159,7 +180,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('NOIREEL')),
+      appBar: widget.appBar ?? AppBar(title: const Text('NOIREEL')),
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
@@ -256,6 +277,7 @@ class _SearchScreenState extends State<SearchScreen> {
           child: _ResultTile(
             title: _results[index],
             onTap: () => _open(_results[index]),
+            picked: widget.pickedIds.contains(_results[index].id),
           ),
         );
       },
@@ -265,10 +287,15 @@ class _SearchScreenState extends State<SearchScreen> {
 
 /// One search result: poster, name, year and Movie/TV (GU-02.03)
 class _ResultTile extends StatelessWidget {
-  const _ResultTile({required this.title, required this.onTap});
+  const _ResultTile({
+    required this.title,
+    required this.onTap,
+    this.picked = false,
+  });
 
   final TitleCard title;
   final VoidCallback onTap;
+  final bool picked; // Already added (picking mode): check instead of ›
 
   @override
   Widget build(BuildContext context) {
@@ -307,7 +334,10 @@ class _ResultTile extends StatelessWidget {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: text.bodyMedium?.color),
+            Icon(
+              picked ? Icons.check_circle : Icons.chevron_right,
+              color: text.bodyMedium?.color,
+            ),
           ],
         ),
       ),

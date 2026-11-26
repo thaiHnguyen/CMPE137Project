@@ -98,6 +98,43 @@ class ApiClient {
     return TitlePage.fromJson(json);
   }
 
+  /// `GET /me/lists`: the logged-in user's lists, newest change first
+  Future<List<UserListSummary>> getMyLists(String token) async {
+    final json = await _send('GET', '/me/lists', token: token);
+    return [
+      for (final l in json['lists'] as List<dynamic>)
+        UserListSummary.fromJson(l as Map<String, dynamic>),
+    ];
+  }
+
+  /// `GET /me/lists/:id`: one of the user's lists with all its entries
+  Future<UserListDetails> getMyList(String token, int listId) async {
+    final json = await _send('GET', '/me/lists/$listId', token: token);
+    return UserListDetails.fromJson(json['list'] as Map<String, dynamic>);
+  }
+
+  /// `POST /me/lists`: creates a list with [titleIds] in that order
+  /// (RU-08.01). A rejected field comes back as an [ApiException] with
+  /// [ApiException.field]
+  Future<UserListDetails> createList(
+    String token, {
+    required String name,
+    String? description,
+    required List<int> titleIds,
+  }) async {
+    final json = await _send(
+      'POST',
+      '/me/lists',
+      token: token,
+      body: {
+        'name': name,
+        'description': description,
+        'titleIds': titleIds,
+      },
+    );
+    return UserListDetails.fromJson(json['list'] as Map<String, dynamic>);
+  }
+
   /// `POST /auth/register`: creates an account and logs it in (GU-07).
   /// A rejected field comes back as an [ApiException] with [ApiException.field]
   Future<AuthResult> register({
