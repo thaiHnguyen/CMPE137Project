@@ -25,6 +25,7 @@ class NewListScreen extends StatefulWidget {
     required this.api,
     required this.auth,
     this.editing,
+    this.collection,
   });
 
   final ApiClient api;        // Connection to the server
@@ -32,6 +33,10 @@ class NewListScreen extends StatefulWidget {
 
   /// The list being edited, or null to make a new one
   final UserListDetails? editing;
+
+  /// Set when editing Favorites or Watchlist (with [editing]): only the
+  /// entries can change, there's no name or description
+  final Collection? collection;
 
   /// How long to hold a poster before it can be dragged
   static const holdToDrag = Duration(milliseconds: 1500);
@@ -69,6 +74,9 @@ class _NewListScreenState extends State<NewListScreen> {
       return _name.text.trim().isNotEmpty ||
           _description.trim().isNotEmpty ||
           _entries.isNotEmpty;
+    }
+    if (widget.collection != null) {
+      return !_sameOrder(_entries, original.entries);
     }
     return _name.text.trim() != original.name ||
         _description.trim() != (original.description ?? '') ||
@@ -195,7 +203,8 @@ class _NewListScreenState extends State<NewListScreen> {
   }
 
   Future<void> _done() async {
-    final name = _name.text.trim();
+    final collection = widget.collection;
+    final name = collection?.label ?? _name.text.trim();
     setState(() {
       _nameError = name.isEmpty ? 'Give your list a name.' : null;
       _error = null;
@@ -215,7 +224,9 @@ class _NewListScreenState extends State<NewListScreen> {
 
     setState(() => _saving = true);
     try {
-      final saved = editing == null
+      final saved = collection != null
+          ? await widget.api.saveCollection(token, collection, titleIds)
+          : editing == null
           ? await widget.api.createList(
               token,
               name: name,
@@ -264,7 +275,13 @@ class _NewListScreenState extends State<NewListScreen> {
           leading: _isEditing
               ? const CancelTextButton()
               : const BackTextButton(),
-          title: Text(_isEditing ? 'Edit List' : 'New List'),
+          title: Text(
+            widget.collection != null
+                ? 'Edit ${widget.collection!.label}'
+                : _isEditing
+                ? 'Edit List'
+                : 'New List',
+          ),
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -300,6 +317,8 @@ class _NewListScreenState extends State<NewListScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
               children: [
+                // Favorites and Watchlist have no name or description
+                if (widget.collection == null) ...[
                 FadeSlideIn(
                   child: TextField(
                     controller: _name,
@@ -335,6 +354,7 @@ class _NewListScreenState extends State<NewListScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                ],
                 FadeSlideIn.staggered(
                   index: 2,
                   child: _FieldBox(
