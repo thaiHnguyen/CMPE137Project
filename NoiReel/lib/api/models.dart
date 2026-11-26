@@ -278,3 +278,79 @@ class UserListDetails {
   final String? description;
   final List<TitleCard> entries; // In the order they were added
 }
+
+/// The logged-in user's own profile (Profile tab and Profile Settings)
+class Profile {
+  /// Creates a [Profile]
+  const Profile({
+    required this.userId,
+    required this.username,
+    required this.email,
+    this.role = 'user',
+    this.displayName,
+    this.bio,
+    this.pronoun,
+    this.avatarUrl,
+    this.goat = const [null, null, null, null, null],
+  });
+
+  /// Reads the server's JSON
+  factory Profile.fromJson(Map<String, dynamic> json) => Profile(
+    userId: json['userId'] as int,
+    username: json['username'] as String,
+    email: json['email'] as String,
+    role: json['role'] as String? ?? 'user',
+    displayName: json['displayName'] as String?,
+    bio: json['bio'] as String?,
+    pronoun: json['pronoun'] as String?,
+    avatarUrl: json['avatarUrl'] as String?,
+    goat: [
+      for (final t in json['goat'] as List<dynamic>)
+        t == null ? null : TitleCard.fromJson(t as Map<String, dynamic>),
+    ],
+  );
+
+  /// How many Greatest Of All Time slots a profile has
+  static const goatSlots = 5;
+
+  /// Pronouns the server accepts, with how the app shows them
+  static const pronouns = {
+    'he/him': 'He / him',
+    'she/her': 'She / her',
+    'they/them': 'They / them',
+    'he/they': 'He / they',
+    'she/they': 'She / they',
+    'xe/xem': 'Xe / xem',
+    'ze/hir': 'Ze / hir',
+    'it/its': 'It / its',
+  };
+
+  final int userId;
+  final String username;        // Can't be changed
+  final String email;
+  final String role;            // `user` or `admin`
+  final String? displayName;    // Null shows the username instead
+  final String? bio;
+  final String? pronoun;        // A key of [pronouns], or null
+  final String? avatarUrl;      // Server path like `/avatars/7-123.jpg`
+  final List<TitleCard?> goat;  // Greatest Of All Time: 5 slots, null = empty
+
+  /// The name to show: the display name, or the username without one
+  String get shownName => displayName ?? username;
+
+  /// The pronoun as shown, e.g. "She / her", or null
+  String? get pronounLabel => pronoun == null ? null : pronouns[pronoun];
+
+  /// A copy with a different Greatest Of All Time
+  Profile withGoat(List<TitleCard?> goat) => Profile(
+    userId: userId,
+    username: username,
+    email: email,
+    role: role,
+    displayName: displayName,
+    bio: bio,
+    pronoun: pronoun,
+    avatarUrl: avatarUrl,
+    goat: goat,
+  );
+}
