@@ -158,3 +158,34 @@ Profile {userId, username, email, role, displayName, bio, pronoun, avatarUrl,
 - `email` is required on every save: trimmed, lowercased, and must not belong to another account (`409`). The username can't be changed.
 - `goat` is the Greatest Of All Time: always 5 slots, left to right, `null` for an empty one. Saving sends all 5; a title can fill only one slot. Unknown ids give a `400`.
 - Avatars: JPEG, PNG or WebP, up to 5 MB (checked by the file's contents, not its name). They're saved in `server/public/avatars/` and `avatarUrl` is a path such as `/avatars/7-1764123456789.jpg`, served by Dart Frog from `public/`. Put the server address in front to show it. Changing or removing an avatar deletes the old file.
+
+## Favorites, Watchlist, reviews and logs
+
+Needs a logged-in user (`Authorization: Bearer <token>`, else `401`). Admin accounts get `403`: these all belong to registered users. An unknown title is `404`.
+
+| Method & path | Body | Success | Errors |
+|---|---|---|---|
+| `GET /me/titles/:id` | none | `200` TitleStatus | `401` · `403` · `404` |
+| `PUT /me/titles/:id/favorite` | none | `200` TitleStatus | same |
+| `DELETE /me/titles/:id/favorite` | none | `200` TitleStatus | same |
+| `PUT /me/titles/:id/watchlist` | none | `200` TitleStatus | same |
+| `DELETE /me/titles/:id/watchlist` | none | `200` TitleStatus | same |
+| `PUT /me/titles/:id/entry` | Entry (below) | `200` TitleStatus | `400 {error:"invalid", field, message}` · `401` · `403` · `404` |
+| `DELETE /me/titles/:id/entry` | none | `200` TitleStatus | `401` · `403` · `404` |
+| `GET /me/favorites` | none | `200 {list: ListDetails}` | `401` · `403` |
+| `PUT /me/favorites` | `{titleIds: [int]}` | `200 {list: ListDetails}` | `400` · `401` · `403` |
+| `GET /me/watchlist` | none | `200 {list: ListDetails}` | `401` · `403` |
+| `PUT /me/watchlist` | `{titleIds: [int]}` | `200 {list: ListDetails}` | `400` · `401` · `403` |
+
+```
+TitleStatus {titleId, favorite: bool, watchlist: bool, logged: bool,
+             entry: {watchedOn: "YYYY-MM-DD" or null, stars: 0.5-5 or null,
+                     review: string or null, spoiler: bool,
+                     moodIds: [int], updatedAt: "YYYY-MM-DD HH:MM:SS" or null}}
+Entry       {watchedOn?, stars?, review?, spoiler?, moodIds?: [up to 3]}
+```
+
+- **Favorites and Watchlist** work like your own lists (entries in order, `PUT` saves a new order or removes/adds entries) but have no name or description to change and can't be deleted. Each user has one of each; it's made the first time it's needed. They don't appear in `GET /me/lists`. Adding a title that's already there, or removing one that isn't, changes nothing.
+- **Entry** is your review and log of one title: the date you watched it (optional, never in the future), your star rating (half stars), your review (up to 5,000 characters, optionally marked as a spoiler) and the moods you vote (up to 3, same votes as `/titles/:id/votes`). `PUT` replaces the whole entry, so send every field; anything left out is removed. At least one of date, rating, review or a mood is needed. Saving a rating updates the title's `avgRating`, `ratingCount` and `ratingHistogram`.
+- `logged` is true once there's a date, a rating or a review: the app then shows "My review and log" instead of "Review or log". `DELETE` removes the date, rating, review and mood votes.
+- One entry per user per title: saving again edits it. An edited review is marked `is_edited` in the database.

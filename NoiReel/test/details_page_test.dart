@@ -22,6 +22,35 @@ class FakeServer {
   final listSaves = <List<Object?>>[]; // titleIds sent by PUT /me/lists/1
   var listTitleIds = <int>[1];
 
+  // The user's status on Kikujiro
+  var favorite = false;
+  var watchlist = false;
+  Map<String, Object?>? entry; // Null: never reviewed or logged
+  final entrySaves = <Map<String, dynamic>>[]; // PUT /me/titles/7/entry
+  var entryDeleted = false;
+
+  Map<String, Object?> get _status {
+    final e = entry;
+    return {
+      'titleId': 7,
+      'favorite': favorite,
+      'watchlist': watchlist,
+      'logged':
+          e != null &&
+          (e['watchedOn'] != null || e['stars'] != null || e['review'] != null),
+      'entry':
+          e ??
+          {
+            'watchedOn': null,
+            'stars': null,
+            'review': null,
+            'spoiler': false,
+            'moodIds': <int>[],
+            'updatedAt': null,
+          },
+    };
+  }
+
   Map<String, Object?> card(int id) => {
     'titleId': id,
     'type': 'movie',
@@ -107,6 +136,47 @@ class FakeServer {
     http.Response json(int status, Object body) =>
         http.Response(jsonEncode(body), status);
     switch ('${req.method} ${req.url.path}') {
+      case 'GET /me/titles/7':
+        return json(200, _status);
+      case 'PUT /me/titles/7/favorite' || 'DELETE /me/titles/7/favorite':
+        favorite = req.method == 'PUT';
+        return json(200, _status);
+      case 'PUT /me/titles/7/watchlist' || 'DELETE /me/titles/7/watchlist':
+        watchlist = req.method == 'PUT';
+        return json(200, _status);
+      case 'PUT /me/titles/7/entry':
+        final body = jsonDecode(req.body) as Map<String, dynamic>;
+        entrySaves.add(body);
+        entry = {...body, 'updatedAt': '2026-11-26 10:00:00'};
+        return json(200, _status);
+      case 'DELETE /me/titles/7/entry':
+        entryDeleted = true;
+        entry = null;
+        return json(200, _status);
+      case 'GET /moods':
+        return json(200, {
+          'moods': [
+            for (final (id, name) in [(1, 'Hopeful'), (3, 'Happy'),
+                (5, 'Calm'), (6, 'Excited')])
+              {
+                'moodId': id,
+                'name': name,
+                'description': '',
+                'colorHex': '#000000',
+                'counterMoodIds': <int>[],
+              },
+          ],
+        });
+      case 'GET /me/profile':
+        return json(200, {
+          'profile': {
+            'userId': 1,
+            'username': 'thai',
+            'email': 'thai@example.com',
+            'displayName': 'Thai Nguyen',
+            'goat': [null, null, null, null, null],
+          },
+        });
       case 'GET /titles/7':
         return json(200, _kikujiro);
       case 'GET /titles/8':
@@ -237,11 +307,11 @@ void main() {
     expect(find.text('Kikujiro'), findsOneWidget);
   });
 
-  group('⋮ Add to a list', () {
+  group('3 dots -> Add to lists', () {
     Future<void> chooseAddToList(WidgetTester tester) async {
       await tester.tap(find.byTooltip('More options'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Add to a list'));
+      await tester.tap(find.text('Add to lists'));
       await tester.pumpAndSettle();
     }
 
@@ -251,8 +321,8 @@ void main() {
 
       expect(
         find.text(
-          'Register or Sign In to your NoiReel account to add titles to a '
-          'list.',
+          'Register or Sign In to your NoiReel account to review, log and '
+          'save titles.',
         ),
         findsOneWidget,
       );
@@ -280,6 +350,208 @@ void main() {
 
       expect(server.listSaves, isEmpty);
       expect(find.text('Already in "Rainy day".'), findsOneWidget);
+    });
+  });
+
+  group('3 dots sheet', () {
+    Future<void> openSheet(WidgetTester tester) async {
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('shows the title, year, Favorite, Watchlist and actions',
+        (tester) async {
+      await pumpDetails(tester, session: _user);
+      await openSheet(tester);
+
+      expect(find.text('1999'), findsOneWidget);
+      expect(find.text('Favorite'), findsOneWidget);
+      expect(find.text('Watchlist'), findsOneWidget);
+      expect(find.text('Review or log'), findsOneWidget);
+      expect(find.text('Add to lists'), findsOneWidget);
+      expect(find.text('View poster'), findsOneWidget);
+    });
+
+    testWidgets('Favorite and Watchlist switch right away', (tester) async {
+      final server = await pumpDetails(tester, session: _user);
+      await openSheet(tester);
+
+      await tester.tap(find.text('Favorite'));
+      await tester.pumpAndSettle();
+      expect(server.favorite, isTrue);
+      expect(find.text('Favorited'), findsOneWidget);
+
+      await tester.tap(find.text('Watchlist'));
+      await tester.pumpAndSettle();
+      expect(server.watchlist, isTrue);
+      expect(find.text('In watchlist'), findsOneWidget);
+
+      await tester.tap(find.text('Favorited'));
+      await tester.pumpAndSettle();
+      expect(server.favorite, isFalse);
+    });
+
+    testWidgets('View poster opens it full screen', (tester) async {
+      await pumpDetails(tester, session: _user);
+      await openSheet(tester);
+      await tester.tap(find.text('View poster'));
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Close'), findsOneWidget);
+    });
+
+    testWidgets('Review or log saves date, stars, moods, review, spoiler',
+        (tester) async {
+      final server = await pumpDetails(tester, session: _user);
+      await openSheet(tester);
+      await tester.tap(find.text('Review or log'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('I Watched'), findsOneWidget);
+      // Today's date is filled in; remove it
+      await tester.tap(find.byTooltip('Remove date'));
+      await tester.pump();
+      expect(find.text('Add date'), findsOneWidget);
+
+      // 4 stars: the right half of the 4th star
+      final stars = tester.getTopLeft(find.bySemanticsLabel('Rating'));
+      await tester.tapAt(stars + const Offset(44 * 3 + 33, 20));
+      await tester.pump();
+      expect(find.textContaining('Rated 4 stars'), findsOneWidget);
+
+      await tester.tap(find.text('Calm'));
+      await tester.tap(find.text('Happy'));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'Lovely summer film.');
+      await tester.pump();
+      await tester.ensureVisible(find.text('No spoilers'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('No spoilers'));
+      await tester.pump();
+      expect(find.text('Contains spoilers'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Save'));
+      await tester.pumpAndSettle();
+
+      expect(server.entrySaves.single, {
+        'watchedOn': null,
+        'stars': 4.0,
+        'review': 'Lovely summer film.',
+        'spoiler': true,
+        'moodIds': [5, 3],
+      });
+      expect(find.text('I Watched'), findsNothing);
+      expect(find.text('Saved.'), findsOneWidget);
+    });
+
+    testWidgets('a 4th mood is refused', (tester) async {
+      await pumpDetails(tester, session: _user);
+      await openSheet(tester);
+      await tester.tap(find.text('Review or log'));
+      await tester.pumpAndSettle();
+
+      for (final m in ['Hopeful', 'Happy', 'Calm', 'Excited']) {
+        await tester.tap(find.text(m));
+        await tester.pump();
+      }
+      expect(find.textContaining('Pick up to 3 moods'), findsOneWidget);
+    });
+
+    testWidgets('x with changes asks before leaving', (tester) async {
+      final server = await pumpDetails(tester, session: _user);
+      await openSheet(tester);
+      await tester.tap(find.text('Review or log'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Calm'));
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Discard changes?'), findsOneWidget);
+      await tester.tap(find.text('Yes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('I Watched'), findsNothing);
+      expect(server.entrySaves, isEmpty);
+    });
+
+    testWidgets('once logged it says My review and log, and opens it',
+        (tester) async {
+      final server = FakeServer()
+        ..favorite = true
+        ..entry = {
+          'watchedOn': '2026-11-08',
+          'stars': 5,
+          'review': 'Wonderful.',
+          'spoiler': false,
+          'moodIds': [5],
+          'updatedAt': '2026-11-08 20:00:00',
+        };
+      await pumpDetails(tester, server: server, session: _user);
+      await openSheet(tester);
+
+      expect(find.text('Review or log'), findsNothing);
+      await tester.tap(find.text('My review and log'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Your Review'), findsOneWidget);
+      expect(find.text('Thai Nguyen'), findsOneWidget);
+      expect(find.text('Watched Nov 8, 2026'), findsOneWidget);
+      expect(find.text('Wonderful.'), findsOneWidget);
+      expect(find.bySemanticsLabel('5 stars'), findsOneWidget);
+      expect(find.bySemanticsLabel('In your Favorites'), findsOneWidget);
+    });
+
+    testWidgets('My review: Delete removes it', (tester) async {
+      final server = FakeServer()
+        ..entry = {
+          'watchedOn': null,
+          'stars': 3.5,
+          'review': null,
+          'spoiler': false,
+          'moodIds': <int>[],
+          'updatedAt': '2026-11-08 20:00:00',
+        };
+      await pumpDetails(tester, server: server, session: _user);
+      await openSheet(tester);
+      await tester.tap(find.text('My review and log'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Review options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete your review?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(server.entryDeleted, isTrue);
+      expect(find.text('Your Review'), findsNothing);
+    });
+
+    testWidgets('My review: Edit opens the filled-in editor', (tester) async {
+      final server = FakeServer()
+        ..entry = {
+          'watchedOn': null,
+          'stars': 2,
+          'review': 'Not for me.',
+          'spoiler': false,
+          'moodIds': [6],
+          'updatedAt': '2026-11-08 20:00:00',
+        };
+      await pumpDetails(tester, server: server, session: _user);
+      await openSheet(tester);
+      await tester.tap(find.text('My review and log'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Review options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit review'), findsOneWidget);
+      expect(find.text('Not for me.'), findsOneWidget);
+      expect(find.textContaining('Rated 2 stars'), findsOneWidget);
+      expect(find.text('Add date'), findsOneWidget);
     });
   });
 }

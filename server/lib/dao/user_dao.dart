@@ -70,9 +70,11 @@ FROM user_accounts''';
         {'id': userId},
       );
       await conn.execute(
-        'INSERT INTO watchlists (user_id, name, visibility, is_default) '
-        "VALUES (:id, 'Watchlist', 'private', TRUE)",
+        
+        'INSERT INTO watchlists (user_id, name, visibility, is_default, '
+        "kind) VALUES (:id, 'Watchlist', 'private', TRUE, 'watchlist')",
         {'id': userId},
+        
       );
     });
     return userId;

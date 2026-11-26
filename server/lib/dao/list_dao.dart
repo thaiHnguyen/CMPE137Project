@@ -2,10 +2,11 @@ import 'package:mysql_client/mysql_client.dart';
 import 'package:server/models/title.dart';
 import 'package:server/models/user_list.dart';
 
-/// A user's own lists (RU-08): `watchlists` rows that aren't the default
-/// Watchlist, and their entries in `watchlist_items`, kept in the order
-/// they were added. Deleting the account deletes its lists (ON DELETE
-/// CASCADE from user_accounts down to watchlist_items)
+/// A user's own lists (RU-08): `watchlists` rows of kind `list` (not the
+/// built-in Watchlist or Favorites, see `CollectionDao`), and their
+/// entries in `watchlist_items`, kept in the order they were added.
+/// Deleting the account deletes its lists (ON DELETE CASCADE from
+/// user_accounts down to watchlist_items)
 class ListDao {
   /// Creates a DAO on a connection pool (normally the shared `db`)
   ListDao(this._db);
@@ -31,13 +32,17 @@ SELECT w.watchlist_id, w.name, w.description,
 FROM watchlists w
 LEFT JOIN watchlist_items i ON i.watchlist_id = w.watchlist_id
 LEFT JOIN titles t ON t.title_id = i.title_id
-WHERE w.user_id = :user AND NOT w.is_default
+WHERE w.user_id = :user AND w.kind = 'list'
 GROUP BY w.watchlist_id
 ORDER BY w.updated_at DESC, w.watchlist_id DESC''';
 
   static const _oneList = '''
 SELECT watchlist_id, name, description FROM watchlists
-WHERE watchlist_id = :list AND user_id = :user AND NOT is_default''';
+WHERE watchlist_id = :list AND user_id = :user AND kind = 'list'
+''';
+
+  /// A list's entries in order (shared with `CollectionDao`)
+  static const entriesQuery = _entries;
 
   static const _entries = '''
 SELECT t.title_id, t.type, t.name, t.release_year, t.poster_url
@@ -56,7 +61,7 @@ VALUES (:list, :title, :position)''';
   // Locks the list row so two saves of the same list run one at a time
   static const _lockList = '''
 SELECT watchlist_id FROM watchlists
-WHERE watchlist_id = :list AND user_id = :user AND NOT is_default
+WHERE watchlist_id = :list AND user_id = :user AND kind = 'list'
 FOR UPDATE''';
 
   // updated_at is set by hand so reordering alone still counts as a change
@@ -70,7 +75,8 @@ WHERE watchlist_id = :list''';
 
   static const _deleteList = '''
 DELETE FROM watchlists
-WHERE watchlist_id = :list AND user_id = :user AND NOT is_default''';
+WHERE watchlist_id = :list AND user_id = :user AND kind = 'list'
+''';
 
   /// The user's lists, most recently changed first
   Future<List<UserListSummary>> myLists(int userId) async {

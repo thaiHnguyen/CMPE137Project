@@ -321,12 +321,19 @@ CREATE TABLE watchlists (
   description  VARCHAR(500) NULL,
   visibility   ENUM('public','private') NOT NULL DEFAULT 'private',
   is_default   BOOLEAN NOT NULL DEFAULT FALSE,       
+  -- 'list' = a list the user made; 'watchlist' and 'favorites' = the two
+  -- built-in lists every user gets (one each, made when first needed)
+  kind         ENUM('list','watchlist','favorites') NOT NULL DEFAULT 'list',
+  -- NULL for user-made lists, so the unique key below only allows one
+  -- watchlist and one favorites list per user
+  special_kind VARCHAR(10) AS (IF(kind = 'list', NULL, kind)) STORED,
   mod_hidden   BOOLEAN NOT NULL DEFAULT FALSE,
   view_count   INT UNSIGNED NOT NULL DEFAULT 0,      -- GU-05.03
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (watchlist_id),
   KEY idx_wl_user (user_id),
+  UNIQUE KEY uq_wl_special (user_id, special_kind),
   KEY idx_wl_public (visibility, mod_hidden, created_at),  -- GU-05.01
   CONSTRAINT fk_wl_user FOREIGN KEY (user_id) REFERENCES registered_users (user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

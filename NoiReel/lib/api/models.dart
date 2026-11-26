@@ -368,3 +368,96 @@ class Profile {
     goat: goat,
   );
 }
+
+/// The two built-in lists every user has
+enum Collection {
+  /// Titles marked with the heart
+  favorites('favorites', 'Favorites'),
+
+  /// Titles to watch later
+  watchlist('watchlist', 'Watchlist');
+
+  const Collection(this.path, this.label);
+
+  final String path;  // URL word: /me/favorites, /me/titles/:id/favorite
+  final String label; // Shown in the app
+}
+
+/// The user's review and log of one title: watch date, star rating,
+/// review and mood votes. Every field can be empty
+class TitleEntry {
+  /// Creates a [TitleEntry]
+  const TitleEntry({
+    this.watchedOn,
+    this.stars,
+    this.review,
+    this.spoiler = false,
+    this.moodIds = const [],
+  });
+
+  /// Reads the server's JSON
+  factory TitleEntry.fromJson(Map<String, dynamic> json) {
+    final date = json['watchedOn'] as String?;
+    return TitleEntry(
+      watchedOn: date == null ? null : DateTime.parse(date),
+      stars: (json['stars'] as num?)?.toDouble(),
+      review: json['review'] as String?,
+      spoiler: json['spoiler'] as bool? ?? false,
+      moodIds: [for (final id in json['moodIds'] as List<dynamic>) id as int],
+    );
+  }
+
+  final DateTime? watchedOn; // Date only (no time)
+  final double? stars;       // 0.5 to 5 in half stars
+  final String? review;
+  final bool spoiler;        // The review gives away the plot
+  final List<int> moodIds;   // Up to 3 moods voted on this title
+
+  /// The date as the server wants it: `YYYY-MM-DD`
+  String? get watchedOnText {
+    final d = watchedOn;
+    if (d == null) return null;
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${d.year}-${two(d.month)}-${two(d.day)}';
+  }
+}
+
+/// The user's status on one title, for its 3 dots menu
+class TitleStatus {
+  /// Creates a [TitleStatus]
+  const TitleStatus({
+    required this.titleId,
+    this.favorite = false,
+    this.watchlist = false,
+    this.logged = false,
+    this.entry = const TitleEntry(),
+  });
+
+  /// Reads the server's JSON
+  factory TitleStatus.fromJson(Map<String, dynamic> json) => TitleStatus(
+    titleId: json['titleId'] as int,
+    favorite: json['favorite'] as bool,
+    watchlist: json['watchlist'] as bool,
+    logged: json['logged'] as bool,
+    entry: TitleEntry.fromJson(json['entry'] as Map<String, dynamic>),
+  );
+
+  final int titleId;
+  final bool favorite;   // In Favorites
+  final bool watchlist;  // In Watchlist
+  final bool logged;     // Has a date, rating or review
+  final TitleEntry entry;
+
+  /// True if the title is in [c]
+  bool inCollection(Collection c) =>
+      c == Collection.favorites ? favorite : watchlist;
+
+  /// A copy with the title added to or taken out of [c]
+  TitleStatus withCollection(Collection c, bool inIt) => TitleStatus(
+    titleId: titleId,
+    favorite: c == Collection.favorites ? inIt : favorite,
+    watchlist: c == Collection.watchlist ? inIt : watchlist,
+    logged: logged,
+    entry: entry,
+  );
+}

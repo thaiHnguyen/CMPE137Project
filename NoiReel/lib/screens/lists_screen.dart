@@ -5,17 +5,19 @@ import '../api/models.dart';
 import '../auth/auth_controller.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/fade_slide_in.dart';
+import '../widgets/library_events.dart';
 import '../widgets/poster_card.dart';
 import 'list_detail_screen.dart';
 import 'login_screen.dart';
 import 'new_list_screen.dart';
 import 'register_screen.dart';
+import 'title_details_screen.dart';
 
 // Pieces of the Profile tab's Favorite, List and Watchlist tabs (they
 // used to be their own Lists tab in the nav bar).
 //
 // MyListsView shows the user's lists; startNewList is what the + button
-// does; ListsComingSoon fills Favorite and Watchlist for now
+// does; CollectionView shows Favorites or the Watchlist
 
 /// The + button: a guest is asked to sign in, an admin is told admins
 /// can't have lists, and anyone else gets the New List page. A list made
@@ -276,17 +278,215 @@ class _ListCard extends StatelessWidget {
   }
 }
 
-/// Placeholder for the Favorite and Watchlist tabs
-class ListsComingSoon extends StatelessWidget {
-  /// Creates the placeholder
-  const ListsComingSoon({super.key, required this.icon, required this.text});
+/// The Favorite or Watchlist tab on Profile: its titles in a poster grid
+/// in their saved order, with Edit to reorder, remove or add titles (the
+/// same editor as a list, without a name or description). Titles get here
+/// from the 3 dots sheet on a title's page
+class CollectionView extends StatefulWidget {
+  /// Creates the tab for [collection]
+  const CollectionView({
+    super.key,
+    required this.api,
+    required this.auth,
+    required this.collection,
+  });
 
-  final IconData icon;
-  final String text;
+  final ApiClient api;
+  final AuthController auth;
+  final Collection collection;
 
   @override
-  Widget build(BuildContext context) =>
-      _Message(icon: icon, text: '$text\nComing soon.');
+  State<CollectionView> createState() => _CollectionViewState();
+}
+
+class _CollectionViewState extends State<CollectionView> {
+  Future<UserListDetails>? _list;
+  String? _token; // Whose collection is loaded
+
+  @override
+  void initState() {
+    super.initState();
+    widget.auth.addListener(_onAuthChanged);
+    libraryChanged.addListener(_load); // changed on a title's page
+    _load();
+  }
+
+  @override
+  void dispose() {
+    widget.auth.removeListener(_onAuthChanged);
+    libraryChanged.removeListener(_load);
+    super.dispose();
+  }
+
+  void _onAuthChanged() {
+    if (widget.auth.value?.token != _token) _load();
+  }
+
+  void _load() {
+    final session = widget.auth.value;
+    setState(() {
+      _token = session?.token;
+      _list = session == null || session.isAdmin
+          ? null
+          : widget.api.getCollection(session.token, widget.collection);
+    });
+  }
+
+  Future<void> _refresh() async {
+    _load();
+    await _list?.catchError(
+      (_) => UserListDetails(id: 0, name: widget.collection.label),
+    );
+  }
+
+  Future<void> _edit(UserListDetails list) async {
+    final saved = await Navigator.of(context).push<UserListDetails>(
+      MaterialPageRoute(
+        builder: (_) => NewListScreen(
+          api: widget.api,
+          auth: widget.auth,
+          editing: list,
+          collection: widget.collection,
+        ),
+      ),
+    );
+    if (saved == null || !mounted) return;
+    setState(() => _list = Future.value(saved));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text('${widget.collection.label} saved.')),
+      );
+  }
+
+  void _open(TitleCard title) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TitleDetailsScreen(api: widget.api, title: title),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final favorites = widget.collection == Collection.favorites;
+    final icon = favorites ? Icons.favorite_outline : Icons.more_time;
+    final session = widget.auth.value;
+
+    if (session == null) {
+      return _Message(
+        icon: icon,
+        text: favorites
+            ? 'Register or sign in to keep your favorite movies and shows.'
+            : 'Register or sign in to keep a watchlist.',
+      );
+    }
+    if (session.isAdmin) {
+      return _Message(
+        icon: icon,
+        text: "Admin accounts don't have a ${widget.collection.label}.",
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: FutureBuilder<UserListDetails>(
+        future: _list,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return _Message(
+              icon: Icons.cloud_off,
+              text: '${snapshot.error}',
+              onRetry: _load,
+            );
+          }
+          final list = snapshot.data!;
+          final titles = list.entries;
+          if (titles.isEmpty) {
+            return _Message(
+              icon: icon,
+              text: favorites
+                  ? 'Titles you favorite will show up here. On a title\'s '
+                        'page, tap the 3 dots, then Favorite.'
+                  : 'Titles you want to watch will show up here. On a '
+                        "title's page, tap the 3 dots, then Watchlist.",
+            );
+          }
+          return _CollectionGrid(
+            titles: titles,
+            onOpen: _open,
+            onEdit: () => _edit(list),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// The titles in a poster grid with a count and Edit above
+class _CollectionGrid extends StatelessWidget {
+  const _CollectionGrid({
+    required this.titles,
+    required this.onOpen,
+    required this.onEdit,
+  });
+
+  final List<TitleCard> titles;
+  final ValueChanged<TitleCard> onOpen;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final n = titles.length;
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '$n ${n == 1 ? 'title' : 'titles'}',
+                    style: text.bodyMedium,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Edit'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          sliver: SliverGrid.builder(
+            gridDelegate: posterGridDelegate,
+            itemCount: n,
+            itemBuilder: (context, i) => FadeSlideIn.staggered(
+              index: i < 12 ? i : 0,
+              step: const Duration(milliseconds: 40),
+              distance: 16,
+              child: GridPoster(
+                title: titles[i],
+                onTap: () => onOpen(titles[i]),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// Centered icon and text, with an optional Try again
