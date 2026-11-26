@@ -75,7 +75,10 @@ class TitleDetails {
     required this.genres,
     required this.credits,
     required this.moods,
+    required this.ratingHistogram,
   })  : card = TitleCard.fromRow(row),
+        originalName = row.colByName('original_name'),
+        backdropUrl = row.colByName('backdrop_url'),
         synopsis = row.colByName('synopsis'),
         runtimeMin = _int(row.colByName('runtime_min')),
         seasons = _int(row.colByName('num_seasons')),
@@ -86,42 +89,45 @@ class TitleDetails {
   /// Poster, name, year and type.
   final TitleCard card;
 
-  /// Plot summary.
+  /// The title in its own language, only when it differs
+  /// from [card]'s name.
+  final String? originalName;
+
+  /// Wide still shown behind the details page header
+  final String? backdropUrl;
+  /// Plot summary
   final String? synopsis;
-
-  /// Movie length, or TV episode length, in minutes.
+  /// Movie length, or TV episode length, in minutes
   final int? runtimeMin;
-
-  /// TV seasons.
+  /// TV seasons
   final int? seasons;
-
-  /// TV episodes.
+  /// TV episodes
   final int? episodes;
-
-  /// Average star rating.
+  /// Average star rating
   final double? avgRating;
-
   /// Number of star ratings.
   final int ratingCount;
-
-  /// Genre names.
+  /// Ratings at each star value
+  final List<int> ratingHistogram;
+  /// Genre names
   final List<String> genres;
-
-  /// Directors or creators, then cast in billing order.
+  /// Directors or creators, then cast in billing order
   final List<Credit> credits;
-
-  /// Mood tags and vote results.
+  /// Mood tags and vote results
   final TitleMoods moods;
 
-  /// JSON sent to the app.
+  /// JSON sent to the app
   Map<String, dynamic> toJson() => {
         ...card.toJson(),
+        'originalName': originalName,
+        'backdropUrl': backdropUrl,
         'synopsis': synopsis,
         'runtimeMin': runtimeMin,
         'seasons': seasons,
         'episodes': episodes,
         'avgRating': avgRating,
         'ratingCount': ratingCount,
+        'ratingHistogram': ratingHistogram,
         'genres': genres,
         'directors': _named('director'),
         'creators': _named('creator'),
