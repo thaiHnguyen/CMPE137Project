@@ -115,12 +115,15 @@ class TitleDetails {
   /// Creates a [TitleDetails]
   const TitleDetails({
     required this.card,
+    this.originalName,
+    this.backdropUrl,
     this.synopsis,
     this.runtimeMin,
     this.seasons,
     this.episodes,
     this.avgRating,
     this.ratingCount = 0,
+    this.ratingHistogram = const [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     this.genres = const [],
     this.directors = const [],
     this.creators = const [],
@@ -137,12 +140,20 @@ class TitleDetails {
     final primary = moods['primary'] as Map<String, dynamic>?;
     return TitleDetails(
       card: TitleCard.fromJson(json),
+      originalName: json['originalName'] as String?,
+      backdropUrl: json['backdropUrl'] as String?,
       synopsis: json['synopsis'] as String?,
       runtimeMin: json['runtimeMin'] as int?,
       seasons: json['seasons'] as int?,
       episodes: json['episodes'] as int?,
       avgRating: (json['avgRating'] as num?)?.toDouble(),
       ratingCount: json['ratingCount'] as int,
+      // Older servers don't send it: treat as no ratings
+      ratingHistogram: switch (json['ratingHistogram']) {
+        final List<dynamic> counts when counts.length == 10 =>
+          counts.cast<int>(),
+        _ => const [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      },
       genres: (json['genres'] as List<dynamic>).cast<String>(),
       directors: _people(json['directors']),
       creators: _people(json['creators']),
@@ -155,12 +166,15 @@ class TitleDetails {
   }
 
   final TitleCard card; // Id, type, name, year and poster
+  final String? originalName; // Title in its own language, if different
+  final String? backdropUrl; // Wide still behind the page header
   final String? synopsis; // Plot summary
   final int? runtimeMin; // Movie length, or TV episode length, in minutes
   final int? seasons; // TV only
   final int? episodes; // TV only
   final double? avgRating; // Average star rating, 0.5 to 5
   final int ratingCount; // Number of star ratings
+  final List<int> ratingHistogram; // Ratings at 0.5, 1.0, ... 5.0 stars
   final List<String> genres; // Genre names
   final List<Person> directors; // Movies
   final List<Person> creators; // TV shows
