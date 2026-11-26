@@ -218,7 +218,11 @@ class _MyReviewScreenState extends State<MyReviewScreen> {
                                   Icon(
                                     Icons.favorite,
                                     size: 20,
-                                    color: favoriteColor,
+                                    color: activeActionColor(
+                                      context,
+                                      background:
+                                          theme.scaffoldBackgroundColor,
+                                    ),
                                     semanticLabel: 'In your Favorites',
                                   ),
                                 ],

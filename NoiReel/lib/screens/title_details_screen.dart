@@ -563,6 +563,11 @@ class _ActionSheetState extends State<_ActionSheet> {
     final isAdmin = widget.signedIn && widget.token == null;
     final loading = widget.token != null && status == null && _error == null;
     final line = Divider(color: fg.withValues(alpha: 0.2), height: 1);
+    // Filled heart and clock: from the theme, readable on the sheet
+    final onColor = activeActionColor(
+      context,
+      background: Theme.of(context).colorScheme.secondary,
+    );
 
     Widget item(IconData icon, String label, _Action action) => ListTile(
       leading: Icon(icon, color: fg),
@@ -613,7 +618,7 @@ class _ActionSheetState extends State<_ActionSheet> {
                       onIcon: Icons.favorite,
                       label: 'Favorite',
                       onLabel: 'Favorited',
-                      onColor: favoriteColor,
+                      onColor: onColor,
                       enabled: !loading,
                       onTap: () => _toggle(Collection.favorites),
                     ),
@@ -625,7 +630,7 @@ class _ActionSheetState extends State<_ActionSheet> {
                       onIcon: Icons.watch_later,
                       label: 'Watchlist',
                       onLabel: 'In watchlist',
-                      onColor: watchlistColor,
+                      onColor: onColor,
                       enabled: !loading,
                       onTap: () => _toggle(Collection.watchlist),
                     ),
