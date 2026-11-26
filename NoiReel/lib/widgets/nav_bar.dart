@@ -33,9 +33,9 @@ const navTabs = [
     selectedIcon: Icons.theater_comedy,
   ),
   NavTab(
-    label: 'Lists',
-    icon: Icons.bookmarks_outlined,
-    selectedIcon: Icons.bookmarks,
+    label: 'Pick for me',
+    icon: Icons.explore_outlined,
+    selectedIcon: Icons.explore,
   ),
   NavTab(
     label: 'Profile',
