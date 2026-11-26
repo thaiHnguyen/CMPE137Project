@@ -163,6 +163,89 @@ class ApiClient {
   Future<void> deleteList(String token, int listId) =>
       _send('DELETE', '/me/lists/$listId', token: token);
 
+  /// `GET /me/titles/:id`: whether the title is in Favorites and
+  /// Watchlist, and the user's review and log of it
+  Future<TitleStatus> getTitleStatus(String token, int titleId) async {
+    final json = await _send('GET', '/me/titles/$titleId', token: token);
+    return TitleStatus.fromJson(json);
+  }
+
+  /// `PUT` or `DELETE /me/titles/:id/favorite|watchlist`: adds the title
+  /// to [collection] or takes it out
+  Future<TitleStatus> setInCollection(
+    String token,
+    int titleId,
+    Collection collection, {
+    required bool add,
+  }) async {
+    final word = collection == Collection.favorites ? 'favorite' : 'watchlist';
+    final json = await _send(
+      add ? 'PUT' : 'DELETE',
+      '/me/titles/$titleId/$word',
+      token: token,
+    );
+    return TitleStatus.fromJson(json);
+  }
+
+  /// `PUT /me/titles/:id/entry`: saves the user's review and log. It
+  /// replaces what was saved before, so pass every field
+  Future<TitleStatus> saveEntry(
+    String token,
+    int titleId,
+    TitleEntry entry,
+  ) async {
+    final review = entry.review?.trim() ?? '';
+    final json = await _send(
+      'PUT',
+      '/me/titles/$titleId/entry',
+      token: token,
+      body: {
+        'watchedOn': entry.watchedOnText,
+        'stars': entry.stars,
+        'review': review.isEmpty ? null : review,
+        'spoiler': entry.spoiler,
+        'moodIds': entry.moodIds,
+      },
+    );
+    return TitleStatus.fromJson(json);
+  }
+
+  /// `DELETE /me/titles/:id/entry`: deletes the user's date, rating,
+  /// review and mood votes on the title
+  Future<TitleStatus> deleteEntry(String token, int titleId) async {
+    final json = await _send(
+      'DELETE',
+      '/me/titles/$titleId/entry',
+      token: token,
+    );
+    return TitleStatus.fromJson(json);
+  }
+
+  /// `GET /me/favorites` or `/me/watchlist`, entries in order
+  Future<UserListDetails> getCollection(
+    String token,
+    Collection collection,
+  ) async {
+    final json = await _send('GET', '/me/${collection.path}', token: token);
+    return UserListDetails.fromJson(json['list'] as Map<String, dynamic>);
+  }
+
+  /// `PUT /me/favorites` or `/me/watchlist`: saves the entries in this
+  /// order (reordered, removed or added)
+  Future<UserListDetails> saveCollection(
+    String token,
+    Collection collection,
+    List<int> titleIds,
+  ) async {
+    final json = await _send(
+      'PUT',
+      '/me/${collection.path}',
+      token: token,
+      body: {'titleIds': titleIds},
+    );
+    return UserListDetails.fromJson(json['list'] as Map<String, dynamic>);
+  }
+
   /// Full address of a file the server hosts, such as an avatar path
   /// (`/avatars/7-123.jpg`). Full URLs are returned as they are
   String mediaUrl(String path) =>
