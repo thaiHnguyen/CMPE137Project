@@ -6,8 +6,8 @@ import '../auth/auth_controller.dart';
 import '../theme/theme_controller.dart';
 import '../widgets/leave_guard.dart';
 import '../widgets/nav_bar.dart';
+import 'coming_soon_screen.dart';
 import 'home_screen.dart';
-import 'lists_screen.dart';
 import 'mood_screen.dart';
 import 'profile_screen.dart';
 import 'search_screen.dart';
@@ -90,8 +90,14 @@ class _AppShellState extends State<AppShell> {
         ),
       1 => SearchScreen(api: widget.api),
       2 => MoodScreen(api: widget.api),
-      3 => ListsScreen(api: widget.api, auth: widget.auth),
-      _ => ProfileScreen(auth: widget.auth),
+      3 => const ComingSoonScreen(
+        title: 'Pick for me',
+        icon: Icons.explore_outlined,
+        description:
+            'Tell us how you feel, whether to match it or lift it, and how '
+            'much time you have, and get a few picks for right now.',
+      ),
+      _ => ProfileScreen(api: widget.api, auth: widget.auth),
     };
   }
 
