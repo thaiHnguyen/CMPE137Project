@@ -6,11 +6,15 @@ import '../api/api_client.dart';
 import '../api/models.dart';
 import '../auth/auth_scope.dart';
 import '../theme/noireel_theme.dart';
+import '../widgets/action_colors.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/fade_slide_in.dart';
+import '../widgets/library_events.dart';
 import '../widgets/poster_card.dart';
 import 'login_screen.dart';
+import 'my_review_screen.dart';
 import 'register_screen.dart';
+import 'review_log_screen.dart';
 
 /// The details page for one movie or show (GU-03), laid out like
 /// Letterboxd's: a wide still fading into the page, round Back and 3 dots
@@ -61,24 +65,95 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
     );
   }
 
-  /// ⋮ → Add to a list: pick one of your lists and add this title at the
-  /// end. A guest is asked to sign in first
+  /// A guest who tried something that needs an account: offers Sign In
+  /// or Register
+  Future<void> _askToSignIn(String what) async {
+    final auth = AuthScope.maybeOf(context);
+    final choice = await askGuestToSignIn(context, what);
+    if (choice == null || !mounted || auth == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => choice == GuestChoice.signIn
+            ? LoginScreen(auth: auth)
+            : RegisterScreen(auth: auth),
+      ),
+    );
+  }
+
+  /// The 3 dots button: a sheet with Favorite, Watchlist, Review or log,
+  /// Add to lists and View poster
+  Future<void> _openActions(TitleCard card) async {
+    final session = AuthScope.maybeOf(context)?.value;
+    final choice = await showModalBottomSheet<_SheetChoice>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.secondary,
+      builder: (_) => _ActionSheet(
+        api: widget.api,
+        card: card,
+        signedIn: session != null,
+        // Admins can't review, log or save titles
+        token: session == null || session.isAdmin ? null : session.token,
+      ),
+    );
+    if (choice == null || !mounted) return;
+    switch (choice.action) {
+      case _Action.signIn:
+        await _askToSignIn('to review, log and save titles');
+      case _Action.review:
+        await _openReview(card, choice.status);
+      case _Action.list:
+        await _addToList();
+      case _Action.poster:
+        _zoomPoster(card);
+    }
+  }
+
+  /// "Review or log" opens the editor; "My review and log" opens the
+  /// user's review. Either way, the page reloads after a change so the
+  /// ratings and mood tags are current
+  Future<void> _openReview(TitleCard card, TitleStatus? status) async {
+    final auth = AuthScope.maybeOf(context);
+    if (auth == null || status == null) return;
+    final navigator = Navigator.of(context);
+
+    final TitleStatus? changed;
+    if (status.logged) {
+      changed = await navigator.push<TitleStatus>(
+        MaterialPageRoute(
+          builder: (_) => MyReviewScreen(
+            api: widget.api,
+            auth: auth,
+            title: card,
+            status: status,
+          ),
+        ),
+      );
+    } else {
+      changed = await navigator.push<TitleStatus>(
+        MaterialPageRoute(
+          builder: (_) => ReviewLogScreen(
+            api: widget.api,
+            auth: auth,
+            title: card,
+            // Keeps mood votes made before, if any
+            existing: status.entry.moodIds.isEmpty ? null : status.entry,
+          ),
+        ),
+      );
+      if (changed != null) _snack('Saved.');
+    }
+    if (changed != null && mounted) _retry();
+  }
+
+  /// 3 dots -> Add to lists: pick one of your lists and add this title at
+  /// the end. A guest is asked to sign in first
   Future<void> _addToList() async {
     final auth = AuthScope.maybeOf(context);
     final session = auth?.value;
     if (auth == null || session == null) {
-      final choice = await askGuestToSignIn(
-        context,
-        'to add titles to a list',
-      );
-      if (choice == null || !mounted || auth == null) return;
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => choice == GuestChoice.signIn
-              ? LoginScreen(auth: auth)
-              : RegisterScreen(auth: auth),
-        ),
-      );
+      await _askToSignIn('to add titles to a list');
       return;
     }
     if (session.isAdmin) {
@@ -191,7 +266,11 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
                         onPressed: () => Navigator.of(context).maybePop(),
                       ),
                       const Spacer(),
-                      _MoreMenu(onAddToList: _addToList),
+                      _RoundButton(
+                        icon: Icons.more_vert,
+                        tooltip: 'More options',
+                        onPressed: () => _openActions(card),
+                      ),
                     ],
                   ),
                 ),
@@ -376,37 +455,281 @@ class _RoundButton extends StatelessWidget {
   }
 }
 
-/// The ⋮ button and its menu
-class _MoreMenu extends StatelessWidget {
-  const _MoreMenu({required this.onAddToList});
+/// What was picked in the 3 dots sheet
+enum _Action {
+  /// A guest tapped something that needs an account
+  signIn,
 
-  final VoidCallback onAddToList;
+  /// Review or log / My review and log
+  review,
+
+  /// Add to lists
+  list,
+
+  /// View poster
+  poster,
+}
+
+/// The sheet's answer, with the user's status as it was when they chose
+typedef _SheetChoice = ({_Action action, TitleStatus? status});
+
+/// The 3 dots sheet, like Letterboxd's: the title and year, Favorite and
+/// Watchlist (they switch right away and the sheet stays open), then
+/// Review or log, Add to lists and View poster
+class _ActionSheet extends StatefulWidget {
+  const _ActionSheet({
+    required this.api,
+    required this.card,
+    required this.signedIn,
+    required this.token,
+  });
+
+  final ApiClient api;
+  final TitleCard card;
+  final bool signedIn; // False for a guest
+  final String? token; // Null for a guest or an admin
+
+  @override
+  State<_ActionSheet> createState() => _ActionSheetState();
+}
+
+class _ActionSheetState extends State<_ActionSheet> {
+  TitleStatus? _status;
+  String? _error;
+  final _busy = <Collection>{}; // Saving a Favorite/Watchlist change
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final token = widget.token;
+    if (token == null) return;
+    try {
+      final status = await widget.api.getTitleStatus(token, widget.card.id);
+      if (mounted) setState(() => _status = status);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    }
+  }
+
+  void _choose(_Action action) {
+    final needsAccount = action != _Action.poster;
+    Navigator.pop<_SheetChoice>(context, (
+      action: !widget.signedIn && needsAccount ? _Action.signIn : action,
+      status: _status,
+    ));
+  }
+
+  /// Adds to or takes out of [c] right away; undone if saving fails
+  Future<void> _toggle(Collection c) async {
+    final token = widget.token;
+    final before = _status;
+    if (!widget.signedIn) return _choose(_Action.signIn);
+    if (token == null || before == null || _busy.contains(c)) return;
+
+    final add = !before.inCollection(c);
+    setState(() {
+      _busy.add(c);
+      _status = before.withCollection(c, add);
+    });
+    try {
+      final saved = await widget.api.setInCollection(
+        token,
+        widget.card.id,
+        c,
+        add: add,
+      );
+      notifyLibraryChanged();
+      if (mounted) setState(() => _status = saved);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _status = before);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy.remove(c));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      tooltip: 'More options',
-      color: Theme.of(context).scaffoldBackgroundColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      onSelected: (choice) {
-        if (choice == 'list') onAddToList();
-      },
-      icon: const Icon(Icons.more_vert),
-      style: IconButton.styleFrom(
-        backgroundColor: Colors.black.withValues(alpha: 0.45),
-        foregroundColor: Colors.white,
-        fixedSize: const Size(48, 48),
+    final text = Theme.of(context).textTheme;
+    final fg = Theme.of(context).colorScheme.onSecondary;
+    final status = _status;
+    final isAdmin = widget.signedIn && widget.token == null;
+    final loading = widget.token != null && status == null && _error == null;
+    final line = Divider(color: fg.withValues(alpha: 0.2), height: 1);
+
+    Widget item(IconData icon, String label, _Action action) => ListTile(
+      leading: Icon(icon, color: fg),
+      title: Text(label, style: text.bodyLarge?.copyWith(color: fg)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      // Waits for the status so Review knows what to open
+      enabled: !(action == _Action.review && loading),
+      onTap: () => _choose(action),
+    );
+
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.card.name,
+                  style: text.titleMedium?.copyWith(
+                    color: fg,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (widget.card.year != null)
+                  Text(
+                    '${widget.card.year}',
+                    style: text.bodyMedium?.copyWith(
+                      color: fg.withValues(alpha: 0.7),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          line,
+          if (!isAdmin) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _ToggleAction(
+                      on: status?.favorite ?? false,
+                      icon: Icons.favorite_border,
+                      onIcon: Icons.favorite,
+                      label: 'Favorite',
+                      onLabel: 'Favorited',
+                      onColor: favoriteColor,
+                      enabled: !loading,
+                      onTap: () => _toggle(Collection.favorites),
+                    ),
+                  ),
+                  Expanded(
+                    child: _ToggleAction(
+                      on: status?.watchlist ?? false,
+                      icon: Icons.more_time,
+                      onIcon: Icons.watch_later,
+                      label: 'Watchlist',
+                      onLabel: 'In watchlist',
+                      onColor: watchlistColor,
+                      enabled: !loading,
+                      onTap: () => _toggle(Collection.watchlist),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            line,
+            const SizedBox(height: 6),
+            if (status?.logged ?? false)
+              item(
+                Icons.rate_review_outlined,
+                'My review and log',
+                _Action.review,
+              )
+            else
+              item(Icons.add, 'Review or log', _Action.review),
+            item(Icons.playlist_add, 'Add to lists', _Action.list),
+          ] else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 14, 24, 6),
+              child: Text(
+                "Admin accounts can't review, log or save titles.",
+                style: text.bodyMedium?.copyWith(color: fg),
+              ),
+            ),
+          if (widget.card.posterUrl != null)
+            item(Icons.open_in_full, 'View poster', _Action.poster),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+              child: Text(
+                _error!,
+                style: text.bodySmall?.copyWith(color: fg),
+              ),
+            ),
+          const SizedBox(height: 12),
+        ],
       ),
-      itemBuilder: (_) => const [
-        PopupMenuItem(
-          value: 'list',
-          child: ListTile(
-            leading: Icon(Icons.playlist_add),
-            title: Text('Add to a list'),
-            contentPadding: EdgeInsets.zero,
+    );
+  }
+}
+
+/// Favorite or Watchlist in the sheet: an icon over a label, filled in
+/// its color when the title is in it
+class _ToggleAction extends StatelessWidget {
+  const _ToggleAction({
+    required this.on,
+    required this.icon,
+    required this.onIcon,
+    required this.label,
+    required this.onLabel,
+    required this.onColor,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final bool on;
+  final IconData icon;
+  final IconData onIcon;
+  final String label;
+  final String onLabel;
+  final Color onColor;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = Theme.of(context).colorScheme.onSecondary;
+    final dim = enabled ? 1.0 : 0.4;
+    return Semantics(
+      button: true,
+      toggled: on,
+      label: label,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                transitionBuilder: (child, animation) =>
+                    ScaleTransition(scale: animation, child: child),
+                child: Icon(
+                  on ? onIcon : icon,
+                  key: ValueKey(on),
+                  size: 44,
+                  color: on ? onColor : fg.withValues(alpha: 0.8 * dim),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                on ? onLabel : label,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: fg.withValues(alpha: dim),
+                ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
