@@ -17,7 +17,10 @@ CMPE-137 SJSU, Fall 2026
 - **Home:** "Discovery", a grid of random posters. It reshuffles every time you tap Home, and when you pull down.
 - **Mood tab:** one row of posters per mood (Hopeful, Gloomy, Happy, Melancholy, Calm, Excited), ranked by how well each title fits the mood, not by popularity. Tap a mood's name to open its own page: every title for that mood in a shuffled grid that loads more as you scroll.
 - **Mood themes:** the **Theme** button opens "How are you feeling today?" and recolors the whole app to the chosen mood. The choice is saved on the device.
-- **Title details page** (Letterboxd-style): a wide still fading into the page, with round Back and ⋮ buttons over it; the name, original-language name in italics, year, director or creator, and length beside the poster (tap the poster to open it full screen, then pinch or double-tap to zoom); the overview; mood tags; a **Ratings** chart (a bar per half star, the average and the count); then community mood votes, cast and genres. ⋮ → **Add to a list** adds the title to the end of one of your lists. Empty fields are hidden.
+- **Title details page** (Letterboxd-style): a wide still fading into the page, with round Back and ⋮ buttons over it; the name, original-language name in italics, year, director or creator, and length beside the poster (tap the poster to open it full screen, then pinch or double-tap to zoom); the overview; mood tags; a **Ratings** chart (a bar per half star, the average and the count); then community mood votes, cast and genres. Empty fields are hidden.
+- **3 dots sheet** on a title's page (Letterboxd-style): the title and year; **Favorite** (heart) and **Watchlist** (clock), which switch right away; **Review or log** (or **My review and log** once you've logged it); **Add to lists**; and **View poster**. A guest is asked to sign in.
+- **Review or log** ("I Watched"): the date you watched it (optional, today by default), a star rating in half stars, up to 3 **mood votes**, your review, and whether it has spoilers. ✕ asks "Discard changes?" if anything changed; ✓ saves.
+- **Your Review**: your photo and name, the title, your stars (and a heart if it's a favorite), the date watched, your moods and your review. Its 3 dots menu edits or deletes it.
 - **Search:**
   - Find movies and shows by title, director, creator or cast. Results appear as you type, and more load as you scroll.
   - Each result shows its poster, year and Movie/TV.
@@ -27,6 +30,7 @@ CMPE-137 SJSU, Fall 2026
   - You stay logged in after a restart. Sign out is in Profile Settings.
   - Errors show clearly: wrong password, the 15-minute lockout, suspended or banned accounts, and taken usernames.
 - **Profile tab:** "Settings" at the top left, your name as the title, and four tabs: **Profile, Favorite, List, Watchlist**. A guest sees Log in and Create account.
+  - **Favorite / Watchlist:** the titles you hearted or saved, in a poster grid. **Edit** works like editing a list (hold to drag, remove, add through search), without a name or description.
   - **Profile:** photo, name, @username · pronoun, bio, and **Greatest Of All Time**: 5 spots. Tap an empty spot to pick a title through search. Tap a filled one to view, replace or remove it.
   - **Profile Settings:** Sign out, photo (add, change or remove), name, email, bio and pronoun. ✕ cancels and ✓ saves; nothing is saved until ✓.
 - **Lists** (the List tab on Profile):
@@ -45,14 +49,15 @@ All routes are in [server/API.md](server/API.md).
 - **Mood voting:** logged-in users vote up to 3 moods per title (`/titles/:id/votes`). The mood with the most votes becomes the title's primary tag.
 - **Lists:** create, read, edit (including the order of entries) and delete your own lists (`/me/lists`). They're private, and deleting an account deletes them.
 - **Profile:** name, bio, pronoun, email, Greatest Of All Time, and photo uploads (`/me/profile`). Photos are saved in `server/public/avatars/` and served by Dart Frog.
+- **Favorites and Watchlist:** add, remove and reorder (`/me/favorites`, `/me/watchlist`, `/me/titles/:id/favorite|watchlist`).
+- **Reviews and logs:** one per user per title, saved in one go: date, rating, review, spoiler flag and mood votes (`/me/titles/:id/entry`). Ratings keep each title's average and chart up to date.
 - **Catalog:** imported from TMDB. Each title's starting moods come from its genres.
 
 ### Not built yet
 
 - **Pick for me** (guided picks by mood, match-or-lift, and available time) shows "Coming soon".
-- **Favorite** and **Watchlist** tabs on Profile, and the "Add to favorite" / "Add to watchlist" buttons on the details page.
-- Vote buttons on the details page (the server side is done).
-- Ratings, reviews, delete account, search filters, and password reset.
+- Other people's reviews on a title's page, comments, likes on reviews, and a diary of past logs.
+- Delete account, search filters, and password reset.
 
 ## Project layout
 
@@ -85,11 +90,13 @@ CMPE137Project/
 │   │   │   ├── home_screen.dart        Home: theme button and the Discovery grid
 │   │   │   ├── mood_screen.dart        Mood tab: one row per mood
 │   │   │   ├── mood_titles_screen.dart one mood's page: shuffled grid, loads more on scroll
-│   │   │   ├── title_details_screen.dart  details page: backdrop, header, poster zoom, Ratings, ⋮ Add to a list
+│   │   │   ├── title_details_screen.dart  details page: backdrop, header, poster zoom, Ratings, 3 dots sheet
+│   │   │   ├── review_log_screen.dart  Review or log ("I Watched"): date, stars, moods, review, spoilers
+│   │   │   ├── my_review_screen.dart   Your Review, with Edit and Delete
 │   │   │   ├── search_screen.dart      Search tab; also "pick a title" mode for lists and GOAT
 │   │   │   ├── profile_screen.dart     Profile tab: the 4 tabs, profile view, Greatest Of All Time
 │   │   │   ├── profile_settings_screen.dart  Profile Settings: photo, name, email, bio, pronoun, Sign out
-│   │   │   ├── lists_screen.dart       the List tab's contents and the + button's flow
+│   │   │   ├── lists_screen.dart       Profile's List, Favorite and Watchlist tabs, and the + button's flow
 │   │   │   ├── new_list_screen.dart    New List and Edit List (hold-to-drag reordering)
 │   │   │   ├── list_detail_screen.dart one list's page, with the … menu (Edit, Delete)
 │   │   │   ├── login_screen.dart       Log in form
@@ -108,7 +115,12 @@ CMPE137Project/
 │   │       ├── dialogs.dart            "Discard changes?", "Delete the list?", the guest sign-in popup,
 │   │       │                           and the Back / Cancel app bar buttons
 │   │       ├── leave_guard.dart        lets an editor ask "Discard changes?" when a nav bar tab is tapped
-│   │       └── profile_avatar.dart     round profile photo with the default silhouette
+│   │       ├── profile_avatar.dart     round profile photo with the default silhouette
+│   │       ├── star_rating.dart        five stars in half steps, read-only or tap/drag to rate
+│   │       ├── mood_chip.dart          a mood as a chip in that mood's theme colors
+│   │       ├── dates.dart              "Nov 8, 2026" style dates
+│   │       ├── action_colors.dart      Favorite orange, Watchlist blue
+│   │       └── library_events.dart     tells Profile's tabs to reload after a change elsewhere
 │   ├── test/
 │   │   ├── widget_test.dart            theme tests
 │   │   ├── title_details_test.dart     details JSON and runtime format tests
@@ -119,7 +131,7 @@ CMPE137Project/
 │   │   ├── mood_titles_test.dart       one mood's page: grid, paging, Back
 │   │   ├── list_test.dart              making, editing, reordering and deleting lists
 │   │   ├── profile_test.dart           profile view, Greatest Of All Time, Profile Settings
-│   │   └── details_page_test.dart      details page layout, Ratings, poster zoom, Add to a list
+│   │   └── details_page_test.dart      details page, 3 dots sheet, Review or log, Your Review
 │   ├── android/app/src/debug/AndroidManifest.xml
 │   │                                   lets the emulator use http:// in debug builds
 │   ├── ios/Runner/Info.plist           includes the photo library permission text (iOS only)
@@ -144,7 +156,8 @@ CMPE137Project/
     │   ├── seed_moods.sql              the 6 moods and genre-to-mood mappings
     │   ├── update_vote_rule.sql        switches an older database to the vote-count rules
     │   ├── update_profile.sql          adds pronoun + Greatest Of All Time to an existing database
-    │   └── update_details.sql          adds backdrop + original name to an existing database
+    │   ├── update_details.sql          adds backdrop + original name to an existing database
+    │   └── update_reviews.sql          adds Favorites (list kinds) to an existing database
     ├── lib/
     │   ├── db.dart                     MySQL connection pool
     │   ├── auth/
@@ -155,6 +168,8 @@ CMPE137Project/
     │   ├── browse/
     │   │   └── paging.dart             ?page= and ?limit=, 400 and 404 responses
     │   ├── dao/                        all SQL lives here
+    │   │   ├── collection_dao.dart     Favorites and Watchlist
+    │   │   ├── entry_dao.dart          reviews and logs: date, rating, review, mood votes
     │   │   ├── list_dao.dart           your lists: create, edit, reorder, delete
     │   │   ├── mood_dao.dart
     │   │   ├── profile_dao.dart        profile fields, Greatest Of All Time, avatar
@@ -162,12 +177,17 @@ CMPE137Project/
     │   │   ├── title_dao.dart          includes Discovery and mood-page shuffles
     │   │   ├── user_dao.dart
     │   │   └── vote_dao.dart           mood votes and the 3-per-title limit
+    │   ├── entries/
+    │   │   ├── entry_request.dart      checks review and log bodies
+    │   │   └── title_status.dart       Favorite/Watchlist/review status for the 3 dots sheet
     │   ├── lists/
+    │   │   ├── collection_route.dart   shared by /me/favorites and /me/watchlist
     │   │   └── list_request.dart       checks list request bodies
     │   ├── models/
     │   │   ├── mood.dart               Mood, TitleMood, TitleMoods
     │   │   ├── profile.dart
     │   │   ├── title.dart
+    │   │   ├── title_entry.dart        one user's review and log of a title
     │   │   ├── user.dart
     │   │   └── user_list.dart          UserListSummary, UserListDetails
     │   ├── profile/
@@ -192,6 +212,13 @@ CMPE137Project/
     │   │   └── index.dart              GET /discover (random posters for Home)
     │   ├── me/                         the logged-in user's own things
     │   │   ├── _middleware.dart
+    │   │   ├── favorites.dart          GET, PUT /me/favorites
+    │   │   ├── watchlist.dart          GET, PUT /me/watchlist
+    │   │   ├── titles/[id]/
+    │   │   │   ├── index.dart          GET /me/titles/:id (status for the 3 dots sheet)
+    │   │   │   ├── entry.dart          PUT, DELETE /me/titles/:id/entry
+    │   │   │   ├── favorite.dart       PUT, DELETE /me/titles/:id/favorite
+    │   │   │   └── watchlist.dart      PUT, DELETE /me/titles/:id/watchlist
     │   │   ├── lists/
     │   │   │   ├── index.dart          GET, POST /me/lists
     │   │   │   └── [id].dart           GET, PUT, DELETE /me/lists/:id
@@ -250,8 +277,9 @@ You're done when http://localhost:8080/health shows:
 | `db/update_vote_rule.sql` | your database is from before November 18 | `SHOW COLUMNS FROM title_moods LIKE 'is_confirmed';` returns a row |
 | `db/update_profile.sql` | your database is from before November 25 (profile page) | `SHOW TABLES LIKE 'goat_picks';` returns nothing |
 | `db/update_details.sql` | your database is from before November 26 (new details page) | `SHOW COLUMNS FROM titles LIKE 'backdrop_url';` returns nothing |
+| `db/update_reviews.sql` | your database is from before the reviews and Favorites update | `SHOW COLUMNS FROM watchlists LIKE 'kind';` returns nothing |
 
-Lists need no update script; they use the `watchlists` tables that were already there.
+Lists, reviews, ratings and logs need no update script of their own; their tables were already there. Favorites need `update_reviews.sql`.
 
 After `update_details.sql`, run the importer again (`dart run bin/import_tmdb.dart`) so the titles you already have get their backdrop and original-language name. It updates titles in place and keeps votes, lists and accounts.
 
@@ -336,34 +364,6 @@ Every time:
 4. Pick the emulator in the device dropdown at the top and click **Run**. The first build takes several minutes; later ones take seconds.
 5. Use **Hot Reload** (Ctrl+\\) after code changes.
 
-## Changing the look
-
-**Theme colors** are all in `NoiReel/lib/theme/noireel_theme.dart`, in `NoiReelPalette.all`. Edit a theme's entry and every screen picks it up.
-
-| Field | Used for |
-|---|---|
-| `background` | Screen background |
-| `navBar` / `navText` | Header and navigation bar, and their text and icons |
-| `button` / `buttonText` | Default button, and its text |
-| `hover` / `clicked` | Button while hovered / pressed |
-| `activeButtonText` | Text on hovered and pressed buttons |
-| `bodyText` | Text, form fields, links and errors on the background (picked to be readable, at least 4.5:1 contrast) |
-| `pickerBorder` | Optional border of the theme's square in the picker; defaults to `navBar` |
-
-A mood theme's `name` must match the mood's name in the database exactly (`Melancholy`, not `Melancholic`).
-
-**Mood tags and vote bars** on the details page use each mood theme's `navBar`, `navText` and picker border. They're drawn by `_MoodTag` and `_VoteBar` in `title_details_screen.dart`.
-
-**Nav bar settings** are in `NoiReel/lib/widgets/nav_bar.dart`:
-- `showLabels = false` hides the labels.
-- `unselectedOpacity` sets how dim the unselected tabs are.
-- `navTabs` holds the icons: `_outlined` versions for `icon`, filled ones for `selectedIcon`.
-
-**Animation speed:** `defaultDuration` in `NoiReel/lib/widgets/fade_slide_in.dart`, currently 500 ms.
-
-**Hold-to-drag time** for reordering list entries: `holdToDrag` in `NoiReel/lib/screens/new_list_screen.dart`, currently 1.5 s. Flutter's normal long press is 500 ms. Use a full restart after changing it.
-
-**Pronoun choices:** `Profile.pronouns` in `NoiReel/lib/api/models.dart` and `ProfileDao.pronouns` in `server/lib/dao/profile_dao.dart`. Keep the two in sync.
 
 ## Troubleshooting
 
