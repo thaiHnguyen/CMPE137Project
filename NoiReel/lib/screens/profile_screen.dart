@@ -300,14 +300,16 @@ class _ProfileScreenState extends State<ProfileScreen>
               onPickGoat: _pickGoat,
               onGoatOptions: _goatOptions,
             ),
-          const ListsComingSoon(
-            icon: Icons.favorite_outline,
-            text: 'Titles you add to your favorites will show up here.',
+          CollectionView(
+            api: widget.api,
+            auth: widget.auth,
+            collection: Collection.favorites,
           ),
           MyListsView(api: widget.api, auth: widget.auth, reload: _reload),
-          const ListsComingSoon(
-            icon: Icons.bookmark_outline,
-            text: 'Titles you add to your watchlist will show up here.',
+          CollectionView(
+            api: widget.api,
+            auth: widget.auth,
+            collection: Collection.watchlist,
           ),
         ],
       ),
