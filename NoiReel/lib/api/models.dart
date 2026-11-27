@@ -393,6 +393,7 @@ class TitleEntry {
     this.review,
     this.spoiler = false,
     this.moodIds = const [],
+    this.reviewId,
   });
 
   /// Reads the server's JSON
@@ -404,6 +405,7 @@ class TitleEntry {
       review: json['review'] as String?,
       spoiler: json['spoiler'] as bool? ?? false,
       moodIds: [for (final id in json['moodIds'] as List<dynamic>) id as int],
+      reviewId: json['reviewId'] as int?,
     );
   }
 
@@ -412,6 +414,7 @@ class TitleEntry {
   final String? review;
   final bool spoiler;        // The review gives away the plot
   final List<int> moodIds;   // Up to 3 moods voted on this title
+  final int? reviewId;       // The review's id, or null with no review
 
   /// The date as the server wants it: `YYYY-MM-DD`
   String? get watchedOnText {
@@ -460,4 +463,173 @@ class TitleStatus {
     logged: logged,
     entry: entry,
   );
+}
+
+/// Who wrote a review or comment
+class Author {
+  /// Creates an [Author]
+  const Author({
+    required this.id,
+    required this.username,
+    this.displayName,
+    this.avatarUrl,
+  });
+
+  /// Reads the server's JSON
+  factory Author.fromJson(Map<String, dynamic> json) => Author(
+    id: json['userId'] as int,
+    username: json['username'] as String,
+    displayName: json['displayName'] as String?,
+    avatarUrl: json['avatarUrl'] as String?,
+  );
+
+  final int id;
+  final String username;
+  final String? displayName;
+  final String? avatarUrl; // Server path, e.g. /avatars/7-123.jpg
+
+  /// The name to show
+  String get shownName => displayName ?? username;
+}
+
+/// A review, in a list or on its own page
+class Review {
+  /// Creates a [Review]
+  const Review({
+    required this.id,
+    required this.author,
+    required this.title,
+    required this.body,
+    required this.createdAt,
+    this.spoiler = false,
+    this.edited = false,
+    this.stars,
+    this.watchedOn,
+    this.favorite = false,
+    this.likeCount = 0,
+    this.commentCount = 0,
+    this.likedByMe = false,
+    this.isMine = false,
+  });
+
+  /// Reads the server's JSON
+  factory Review.fromJson(Map<String, dynamic> json) {
+    final date = json['watchedOn'] as String?;
+    return Review(
+      id: json['reviewId'] as int,
+      author: Author.fromJson(json['author'] as Map<String, dynamic>),
+      title: TitleCard.fromJson(json['title'] as Map<String, dynamic>),
+      body: json['body'] as String,
+      spoiler: json['spoiler'] as bool? ?? false,
+      edited: json['edited'] as bool? ?? false,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+        (json['createdAt'] as int) * 1000,
+      ),
+      stars: (json['stars'] as num?)?.toDouble(),
+      watchedOn: date == null ? null : DateTime.parse(date),
+      favorite: json['favorite'] as bool? ?? false,
+      likeCount: json['likeCount'] as int? ?? 0,
+      commentCount: json['commentCount'] as int? ?? 0,
+      likedByMe: json['likedByMe'] as bool? ?? false,
+      isMine: json['isMine'] as bool? ?? false,
+    );
+  }
+
+  final int id;
+  final Author author;
+  final TitleCard title;
+  final String body;
+  final DateTime createdAt;
+  final bool spoiler;      // Hidden behind a warning for other people
+  final bool edited;
+  final double? stars;     // The author's rating
+  final DateTime? watchedOn;
+  final bool favorite;     // In the author's Favorites (the heart)
+  final int likeCount;
+  final int commentCount;
+  final bool likedByMe;
+  final bool isMine;
+
+  /// A copy with new like numbers
+  Review withLikes({required int count, required bool mine}) => Review(
+    id: id,
+    author: author,
+    title: title,
+    body: body,
+    createdAt: createdAt,
+    spoiler: spoiler,
+    edited: edited,
+    stars: stars,
+    watchedOn: watchedOn,
+    favorite: favorite,
+    likeCount: count,
+    commentCount: commentCount,
+    likedByMe: mine,
+    isMine: isMine,
+  );
+}
+
+/// A comment under a review
+class ReviewComment {
+  /// Creates a [ReviewComment]
+  const ReviewComment({
+    required this.id,
+    required this.author,
+    required this.body,
+    required this.createdAt,
+    this.likeCount = 0,
+    this.likedByMe = false,
+    this.isMine = false,
+  });
+
+  /// Reads the server's JSON
+  factory ReviewComment.fromJson(Map<String, dynamic> json) => ReviewComment(
+    id: json['commentId'] as int,
+    author: Author.fromJson(json['author'] as Map<String, dynamic>),
+    body: json['body'] as String,
+    createdAt: DateTime.fromMillisecondsSinceEpoch(
+      (json['createdAt'] as int) * 1000,
+    ),
+    likeCount: json['likeCount'] as int? ?? 0,
+    likedByMe: json['likedByMe'] as bool? ?? false,
+    isMine: json['isMine'] as bool? ?? false,
+  );
+
+  final int id;
+  final Author author;
+  final String body;
+  final DateTime createdAt;
+  final int likeCount;
+  final bool likedByMe;
+  final bool isMine;
+
+  /// A copy with new like numbers
+  ReviewComment withLikes({required int count, required bool mine}) =>
+      ReviewComment(
+        id: id,
+        author: author,
+        body: body,
+        createdAt: createdAt,
+        likeCount: count,
+        likedByMe: mine,
+        isMine: isMine,
+      );
+}
+
+/// One page of a title's reviews
+class ReviewPage {
+  /// Creates a [ReviewPage]
+  const ReviewPage({required this.reviews, required this.total});
+
+  /// Reads the server's JSON
+  factory ReviewPage.fromJson(Map<String, dynamic> json) => ReviewPage(
+    reviews: [
+      for (final r in json['reviews'] as List<dynamic>)
+        Review.fromJson(r as Map<String, dynamic>),
+    ],
+    total: json['total'] as int,
+  );
+
+  final List<Review> reviews;
+  final int total; // Across all pages
 }

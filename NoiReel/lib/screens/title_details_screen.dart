@@ -11,10 +11,14 @@ import '../widgets/dialogs.dart';
 import '../widgets/fade_slide_in.dart';
 import '../widgets/library_events.dart';
 import '../widgets/poster_card.dart';
+import '../widgets/review_card.dart';
+import 'all_reviews_screen.dart';
 import 'login_screen.dart';
 import 'my_review_screen.dart';
 import 'register_screen.dart';
 import 'review_log_screen.dart';
+import 'review_screen.dart';
+import 'similar_titles_screen.dart';
 
 /// The details page for one movie or show (GU-03), laid out like
 /// Letterboxd's: a wide still fading into the page, round Back and 3 dots
@@ -38,9 +42,21 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
 
   Future<TitleDetails> _load() => widget.api.getTitle(widget.title.id);
 
+  // Bumped on every reload, so the Reviews section reloads too
+  int _version = 0;
+
   void _retry() => setState(() {
     _details = _load();
+    _version++;
   });
+
+  void _openSimilar(TitleCard card) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SimilarTitlesScreen(api: widget.api, title: card),
+      ),
+    );
+  }
 
   void _snack(String message) {
     if (!mounted) return;
@@ -119,6 +135,18 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
     final auth = AuthScope.maybeOf(context);
     if (auth == null || status == null) return;
     final navigator = Navigator.of(context);
+
+    final reviewId = status.entry.reviewId;
+    if (reviewId != null) {
+      // Has a review: its own page, with likes and comments
+      final changed = await navigator.push<bool>(
+        MaterialPageRoute(
+          builder: (_) => ReviewScreen(api: widget.api, reviewId: reviewId),
+        ),
+      );
+      if ((changed ?? false) && mounted) _retry();
+      return;
+    }
 
     final TitleStatus? changed;
     if (status.logged) {
@@ -205,19 +233,31 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
               CustomScrollView(
                 slivers: [
                   SliverToBoxAdapter(
-                    child: _Backdrop(
-                      url: details?.backdropUrl,
-                      // No still: a blurred poster stands in
-                      fallbackUrl: card.posterUrl,
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _Centered(
-                      child: _Header(
-                        card: card,
-                        details: details,
-                        onPosterTap: () => _zoomPoster(card),
-                      ),
+                    // The poster sits over the bottom of the backdrop
+                    child: Stack(
+                      children: [
+                        _Backdrop(
+                          url: details?.backdropUrl,
+                          // No still: a blurred poster stands in
+                          fallbackUrl: card.posterUrl,
+                        ),
+                        Padding(
+                          padding: EdgeInsets.only(
+                            top: _Backdrop.headerTop(
+                              context,
+                              hasImage: details?.backdropUrl != null ||
+                                  card.posterUrl != null,
+                            ),
+                          ),
+                          child: _Centered(
+                            child: _Header(
+                              card: card,
+                              details: details,
+                              onPosterTap: () => _zoomPoster(card),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   if (loading)
@@ -286,7 +326,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
 
   /// The parts of the page below the header, skipping empty ones
   /// (GU-03.04)
-  static List<Widget> _sections(TitleDetails details) {
+  List<Widget> _sections(TitleDetails details) {
     final synopsis = details.synopsis?.trim() ?? '';
     final primary = details.primaryMood;
     return [
@@ -297,14 +337,11 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
             child: _Synopsis(text: synopsis),
           ),
         ),
-      if (primary != null)
-        _Centered(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: _MoodSection(details: details),
-          ),
-        ),
       const SizedBox(height: 28),
+      if (primary != null) ...[
+        const _FullDivider(),
+        _Panel(title: 'Mood Tags', child: _MoodSection(details: details)),
+      ],
       const _FullDivider(),
       _Panel(title: 'Ratings', child: _RatingsChart(details: details)),
       if (details.cast.isNotEmpty) ...[
@@ -322,7 +359,260 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
           ),
         ),
       ],
+      const _FullDivider(),
+      _SimilarRow(onTap: () => _openSimilar(details.card)),
+      const _FullDivider(),
+      _ReviewsSection(
+        key: ValueKey(_version),
+        api: widget.api,
+        title: details.card,
+        onChanged: _retry,
+      ),
     ];
+  }
+}
+
+/// "Similar mood >": opens titles with a similar mood
+class _SimilarRow extends StatelessWidget {
+  const _SimilarRow({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final bodyText = Theme.of(context).colorScheme.onSurface;
+    return _Centered(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Similar mood',
+                  style: text.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right, color: bodyText.withValues(alpha: 0.7)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Reviews, with "Popular" (everyone's, most liked first) and "You" (your
+/// own) tabs like Letterboxd's. Shows the top few; "All reviews" opens the
+/// rest. Tapping a review opens it with its comments
+class _ReviewsSection extends StatefulWidget {
+  const _ReviewsSection({
+    super.key,
+    required this.api,
+    required this.title,
+    required this.onChanged,
+  });
+
+  final ApiClient api;
+  final TitleCard title;
+  final VoidCallback onChanged; // A review changed: reload the page
+
+  /// Reviews shown before "All reviews"
+  static const shown = 5;
+
+  @override
+  State<_ReviewsSection> createState() => _ReviewsSectionState();
+}
+
+class _ReviewsSectionState extends State<_ReviewsSection> {
+  bool _mine = false; // The "You" tab
+  Future<ReviewPage>? _popular;
+  Future<ReviewPage>? _you;
+
+  String? get _token => AuthScope.maybeOf(context)?.value?.token;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Also reloads after logging in or out (AuthScope changes)
+    _popular = widget.api.getReviews(
+      widget.title.id,
+      token: _token,
+      limit: _ReviewsSection.shown,
+    );
+    _you = null;
+  }
+
+  Future<ReviewPage> _loadYou() => _you ??= widget.api.getReviews(
+    widget.title.id,
+    token: _token,
+    mine: true,
+    limit: 1,
+  );
+
+  Future<void> _open(Review review) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ReviewScreen(
+          api: widget.api,
+          reviewId: review.id,
+          preview: review,
+        ),
+      ),
+    );
+    if ((changed ?? false) && mounted) widget.onChanged();
+  }
+
+  Future<void> _openAll() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AllReviewsScreen(api: widget.api, title: widget.title),
+      ),
+    );
+    if ((changed ?? false) && mounted) widget.onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final text = theme.textTheme;
+    final bodyText = theme.colorScheme.onSurface;
+    final muted = bodyText.withValues(alpha: 0.7);
+
+    Widget tab(String label, bool on, VoidCallback onTap) => Expanded(
+      child: Semantics(
+        button: true,
+        selected: on,
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Text(
+                  label,
+                  style: text.titleMedium?.copyWith(
+                    color: on ? bodyText : muted,
+                    fontWeight: on ? FontWeight.w800 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                height: 3,
+                color: on
+                    ? activeActionColor(
+                  context,
+                  background: theme.scaffoldBackgroundColor,
+                )
+                    : Colors.transparent,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return _Centered(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              tab('Popular', !_mine, () => setState(() => _mine = false)),
+              tab('You', _mine, () => setState(() => _mine = true)),
+            ],
+          ),
+          Divider(color: bodyText.withValues(alpha: 0.25), height: 1),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Text(
+              _mine ? 'YOUR REVIEW' : 'POPULAR REVIEWS',
+              style: text.labelLarge?.copyWith(
+                letterSpacing: 1.4,
+                color: bodyText.withValues(alpha: 0.8),
+              ),
+            ),
+          ),
+          FutureBuilder<ReviewPage>(
+            key: ValueKey(_mine),
+            future: _mine ? _loadYou() : _popular,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text('${snapshot.error}'),
+                );
+              }
+              final page = snapshot.data!;
+              if (page.reviews.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+                  child: Text(
+                    _mine
+                        ? (_token == null
+                        ? 'Sign in to review this title.'
+                        : "You haven't reviewed this yet. Tap the 3 "
+                        'dots, then Review or log.')
+                        : 'No reviews yet. Be the first: tap the 3 dots, '
+                        'then Review or log.',
+                    style: text.bodyMedium?.copyWith(color: muted),
+                  ),
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final (i, r) in page.reviews.indexed) ...[
+                    if (i > 0)
+                      Divider(
+                        indent: 74,
+                        height: 1,
+                        color: bodyText.withValues(alpha: 0.15),
+                      ),
+                    ReviewCard(
+                      api: widget.api,
+                      review: r,
+                      onTap: () => _open(r),
+                    ),
+                  ],
+                  if (!_mine && page.total > page.reviews.length)
+                    InkWell(
+                      onTap: _openAll,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 14, 16, 14),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'All reviews (${page.total})',
+                                style: text.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Icon(Icons.chevron_right, color: muted),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -350,6 +640,22 @@ class _Centered extends StatelessWidget {
 class _Backdrop extends StatelessWidget {
   const _Backdrop({required this.url, required this.fallbackUrl});
 
+  /// How far the poster overlaps the bottom of the picture
+  static const posterOverlap = 72.0;
+
+  static double heightFor(double width) =>
+      (width * 9 / 16).clamp(200.0, 340.0);
+
+  /// Where the header starts: over the picture's bottom, or just below
+  /// the Back and 3 dots buttons when there's no picture
+  static double headerTop(BuildContext context, {required bool hasImage}) {
+    final belowButtons = MediaQuery.paddingOf(context).top + 72;
+    if (!hasImage) return belowButtons;
+    final overlapping =
+        heightFor(MediaQuery.sizeOf(context).width) - posterOverlap;
+    return overlapping > belowButtons ? overlapping : belowButtons;
+  }
+
   final String? url;         // The still, or null
   final String? fallbackUrl; // Poster to blur when there's no still
 
@@ -362,10 +668,10 @@ class _Backdrop extends StatelessWidget {
 
     // Room for the Back and 3 dots buttons even with no picture at all
     if (url == null && fallback == null) {
-      return SizedBox(height: MediaQuery.paddingOf(context).top + 72);
+      return SizedBox(height: headerTop(context, hasImage: false));
     }
 
-    final height = (width * 9 / 16).clamp(200.0, 340.0);
+    final height = heightFor(width);
     final Widget image = url != null
         ? Image.network(
       url,
@@ -748,72 +1054,47 @@ class _Header extends StatelessWidget {
     final length = d == null ? const <String>[] : _lengthFacts(d);
     final original = d?.originalName;
 
-    final byline = [
-      if (card.year != null) '${card.year}',
+    final dim = bodyText.withValues(alpha: 0.8);
+    final dot = TextSpan(text: '  ·  ', style: TextStyle(color: dim));
+    final facts = <InlineSpan>[
+      if (card.year != null) TextSpan(text: '${card.year}'),
       if (makers.isNotEmpty)
-        isTv ? 'CREATED BY' : 'DIRECTED BY'
-      else
-        isTv ? 'TV SHOW' : 'MOVIE',
-    ].join('  ·  ');
+        TextSpan(children: [
+          TextSpan(
+            text: isTv ? 'Created by: ' : 'Directed by: ',
+            style: TextStyle(color: dim),
+          ),
+          TextSpan(
+            text: makers.map((p) => p.name).join(', '),
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+        ])
+      else if (d != null)
+        TextSpan(text: isTv ? 'TV show' : 'Movie', style: TextStyle(color: dim)),
+      for (final fact in length) TextSpan(text: fact),
+    ];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  card.name,
-                  style: text.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    height: 1.15,
-                  ),
-                ),
-                if (original != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    original,
-                    style: text.titleMedium?.copyWith(
-                      fontStyle: FontStyle.italic,
-                      color: bodyText.withValues(alpha: 0.75),
+          Semantics(
+            button: card.posterUrl != null,
+            label: card.posterUrl == null ? null : 'View poster',
+            child: GestureDetector(
+              onTap: onPosterTap,
+              child: Container(
+                width: 140,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
                     ),
-                  ),
-                ],
-                const SizedBox(height: 18),
-                Text(
-                  byline,
-                  style: text.labelLarge?.copyWith(
-                    letterSpacing: 1.3,
-                    color: bodyText.withValues(alpha: 0.8),
-                  ),
+                  ],
                 ),
-                if (makers.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    makers.map((p) => p.name).join(', '),
-                    style: text.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-                if (length.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text(length.join('  ·  '), style: text.bodyLarge),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          SizedBox(
-            width: 118,
-            child: Semantics(
-              button: card.posterUrl != null,
-              label: card.posterUrl == null ? null : 'View poster',
-              child: GestureDetector(
-                onTap: onPosterTap,
                 child: Hero(
                   tag: _PosterViewer.heroTag(card),
                   child: PosterImage(url: card.posterUrl, type: card.type),
@@ -821,6 +1102,39 @@ class _Header extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 18),
+          Text(
+            card.name,
+            textAlign: TextAlign.center,
+            style: text.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+              height: 1.15,
+            ),
+          ),
+          if (original != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              original,
+              textAlign: TextAlign.center,
+              style: text.titleMedium?.copyWith(
+                fontStyle: FontStyle.italic,
+                color: bodyText.withValues(alpha: 0.75),
+              ),
+            ),
+          ],
+          if (facts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text.rich(
+              TextSpan(children: [
+                for (var i = 0; i < facts.length; i++) ...[
+                  if (i > 0) dot,
+                  facts[i],
+                ],
+              ]),
+              textAlign: TextAlign.center,
+              style: text.bodyLarge?.copyWith(height: 1.5),
+            ),
+          ],
         ],
       ),
     );
@@ -1377,9 +1691,9 @@ class _MoodTag extends StatelessWidget {
   }
 }
 
-/// "Show votes" / "Hide votes" under the mood tags. 
+/// "Show votes" / "Hide votes" under the mood tags.
 /// Off: outlined in the theme's text color
-/// On: filled with the theme's button color 
+/// On: filled with the theme's button color
 class _ShowVotesButton extends StatelessWidget {
   const _ShowVotesButton({required this.on, required this.onPressed});
 

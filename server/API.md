@@ -189,3 +189,34 @@ Entry       {watchedOn?, stars?, review?, spoiler?, moodIds?: [up to 3]}
 - **Entry** is your review and log of one title: the date you watched it (optional, never in the future), your star rating (half stars), your review (up to 5,000 characters, optionally marked as a spoiler) and the moods you vote (up to 3, same votes as `/titles/:id/votes`). `PUT` replaces the whole entry, so send every field; anything left out is removed. At least one of date, rating, review or a mood is needed. Saving a rating updates the title's `avgRating`, `ratingCount` and `ratingHistogram`.
 - `logged` is true once there's a date, a rating or a review: the app then shows "My review and log" instead of "Review or log". `DELETE` removes the date, rating, review and mood votes.
 - One entry per user per title: saving again edits it. An edited review is marked `is_edited` in the database.
+
+## Similar titles, reviews, likes and comments
+
+Reading is open to everyone; logging in is optional and adds `likedByMe` / `isMine`. Liking and commenting need a registered user (`401` if not logged in, `403` for an admin).
+
+| Method & path | Body | Success | Errors |
+|---|---|---|---|
+| `GET /titles/:id/similar?page&limit` | none | `200 {page, limit, total, titles: [TitleCard]}` | `400` paging · `404` |
+| `GET /titles/:id/reviews?page&limit&sort=popular\|recent&mine=1` | none | `200 {page, limit, total, reviews: [Review]}` | `400` paging · `404` |
+| `GET /reviews/:id` | none | `200 {review: Review, comments: [Comment]}` | `404` |
+| `PUT /reviews/:id/like` | none | `200 {likeCount, likedByMe}` | `400` your own review · `401` · `403` · `404` |
+| `DELETE /reviews/:id/like` | none | `200 {likeCount, likedByMe}` | `401` · `403` · `404` |
+| `POST /reviews/:id/comments` | `{body}` | `201 {comment: Comment}` | `400 {field:"body"}` · `401` · `403` · `404` |
+| `DELETE /comments/:id` | none | `204` | `401` · `403` not yours · `404` |
+| `PUT /comments/:id/like` | none | `200 {likeCount, likedByMe}` | `400` your own comment · `401` · `403` · `404` |
+| `DELETE /comments/:id/like` | none | `200 {likeCount, likedByMe}` | `401` · `403` · `404` |
+
+```
+Review  {reviewId, author: {userId, username, displayName, avatarUrl},
+         title: TitleCard, body, spoiler, edited, createdAt (Unix seconds),
+         stars, watchedOn, favorite (in the author's Favorites),
+         likeCount, commentCount, likedByMe, isMine}
+Comment {commentId, author, body, createdAt (Unix seconds), likeCount,
+         likedByMe, isMine}
+```
+
+- **Similar:** titles that share this title's main mood, or at least 3 of its 5 mood tags. Most alike first: same main mood, then more shared tags, then the stronger fit.
+- **Reviews:** `popular` (default) is most liked, then most commented, then newest. `mine=1` returns only your own review, for the "You" tab; a guest gets an empty list.
+- **Comments:** oldest first, up to 500, each up to 2,000 characters. You can delete your own. Deleting a review (`DELETE /me/titles/:id/entry`, or clearing its text) also deletes its likes and comments.
+- You can't like your own review or comment.
+- `GET /me/titles/:id` now includes `entry.reviewId`, so the app can open your review's page.

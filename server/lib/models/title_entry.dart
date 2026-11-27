@@ -10,6 +10,7 @@ class TitleEntry {
     this.spoiler = false,
     this.moodIds = const [],
     this.updatedAt,
+    this.reviewId,
   });
 
   /// Watch date as `YYYY-MM-DD`, or null if they didn't give one
@@ -22,6 +23,9 @@ class TitleEntry {
   final bool spoiler;
   /// Moods they voted on this title (up to 3)
   final List<int> moodIds;
+  /// The review's id (for its page and comments), or null with no review
+  final int? reviewId;
+
   /// Last change to the date, rating or review (`YYYY-MM-DD HH:MM:SS`)
   final String? updatedAt;
 
@@ -37,5 +41,6 @@ class TitleEntry {
     'spoiler': spoiler,
     'moodIds': moodIds,
     'updatedAt': updatedAt,
+    'reviewId': reviewId,
   };
 }

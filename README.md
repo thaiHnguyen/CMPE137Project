@@ -21,6 +21,9 @@ CMPE-137 SJSU, Fall 2026
 - **3 dots sheet** on a title's page (Letterboxd-style): the title and year; **Favorite** (heart) and **Watchlist** (clock), which switch right away; **Review or log** (or **My review and log** once you've logged it); **Add to lists**; and **View poster**. A guest is asked to sign in.
 - **Review or log** ("I Watched"): the date you watched it (optional, today by default), a star rating in half stars, up to 3 **mood votes**, your review, and whether it has spoilers. ✕ asks "Discard changes?" if anything changed; ✓ saves.
 - **Your Review**: your photo and name, the title, your stars (and a heart if it's a favorite), the date watched, your moods and your review. Its 3 dots menu edits or deletes it.
+- **Similar mood** (below Genres on a title's page): a poster grid of titles that share the title's main mood, or at least 3 of its mood tags, most alike first.
+- **Reviews** (below Similar mood): **Popular** (everyone's, most liked first) and **You** (your own) tabs, the top 5 with **All reviews** for the rest. Other people's spoiler reviews are hidden behind a warning.
+- **A review's page**: the author, title, stars, heart and date watched, the review (a spoiler one stays hidden until **Show review**), **Like?** with the like count, then every comment on the same page, each with its own likes. The **+** button opens **Add Comment**. You can delete your own comments; the review's author can edit or delete the review from its 3 dots menu.
 - **Search:**
   - Find movies and shows by title, director, creator or cast. Results appear as you type, and more load as you scroll.
   - Each result shows its poster, year and Movie/TV.
@@ -32,12 +35,12 @@ CMPE-137 SJSU, Fall 2026
 - **Profile tab:** "Settings" at the top left, your name as the title, and four tabs: **Profile, Favorite, List, Watchlist**. A guest sees Log in and Create account.
   - **Favorite / Watchlist:** the titles you hearted or saved, in a poster grid. **Edit** works like editing a list (hold to drag, remove, add through search), without a name or description.
   - **Profile:** photo, name, @username · pronoun, bio, and **Greatest Of All Time**: 5 spots. Tap an empty spot to pick a title through search. Tap a filled one to view, replace or remove it.
-  - **Profile Settings:** Sign out, photo (add, change or remove), name, email, bio and pronoun. ✕ cancels and ✓ saves; nothing is saved until ✓.
+  - **Profile Settings:** Sign out, photo (add, change or remove), name, email, bio and pronoun.
 - **Lists** (the List tab on Profile):
   - The **+** button above the nav bar makes a new list: name, description, and entries added through search, kept in the order added. A guest is asked to register or sign in first.
   - Lists show as cards with their first posters. Tap one to see its entries in a poster grid.
   - The **…** menu on a list edits it (rename, change the description, add or remove entries, or **hold a poster to drag it** to a new spot) or deletes it ("Delete the list?").
-  - Leaving the editor or Profile Settings with unsaved changes, through Back, Cancel, ✕ or the nav bar, asks "Discard changes?" first.
+  - Leaving the editor or Profile Settings with unsaved changes, through Back, Cancel, x or the nav bar, asks "Discard changes?" first.
 - **Animations:** pages, tabs, rows and sections fade in while sliding up. They're skipped if the device has reduced motion turned on.
 
 ### Server
@@ -51,12 +54,13 @@ All routes are in [server/API.md](server/API.md).
 - **Profile:** name, bio, pronoun, email, Greatest Of All Time, and photo uploads (`/me/profile`). Photos are saved in `server/public/avatars/` and served by Dart Frog.
 - **Favorites and Watchlist:** add, remove and reorder (`/me/favorites`, `/me/watchlist`, `/me/titles/:id/favorite|watchlist`).
 - **Reviews and logs:** one per user per title, saved in one go: date, rating, review, spoiler flag and mood votes (`/me/titles/:id/entry`). Ratings keep each title's average and chart up to date.
+- **Similar titles, reviews, likes and comments:** `/titles/:id/similar`, `/titles/:id/reviews`, `/reviews/:id` (with its comments, likes and new comments) and `/comments/:id` (delete, like).
 - **Catalog:** imported from TMDB. Each title's starting moods come from its genres.
 
 ### Not built yet
 
 - **Pick for me** (guided picks by mood, match-or-lift, and available time) shows "Coming soon".
-- Other people's reviews on a title's page, comments, likes on reviews, and a diary of past logs.
+- A diary of past logs, following other users, and a "Friends" reviews tab.
 - Delete account, search filters, and password reset.
 
 ## Project layout
@@ -92,7 +96,11 @@ CMPE137Project/
 │   │   │   ├── mood_titles_screen.dart one mood's page: shuffled grid, loads more on scroll
 │   │   │   ├── title_details_screen.dart  details page: backdrop, header, poster zoom, Ratings, 3 dots sheet
 │   │   │   ├── review_log_screen.dart  Review or log ("I Watched"): date, stars, moods, review, spoilers
-│   │   │   ├── my_review_screen.dart   Your Review, with Edit and Delete
+│   │   │   ├── my_review_screen.dart   Your Review (a log without a review text), with Edit and Delete
+│   │   │   ├── review_screen.dart      a review's page: likes and all its comments, + to add one
+│   │   │   ├── add_comment_screen.dart Add Comment
+│   │   │   ├── all_reviews_screen.dart every review of a title, most liked first
+│   │   │   ├── similar_titles_screen.dart  Similar mood grid
 │   │   │   ├── search_screen.dart      Search tab; also "pick a title" mode for lists and GOAT
 │   │   │   ├── profile_screen.dart     Profile tab: the 4 tabs, profile view, Greatest Of All Time
 │   │   │   ├── profile_settings_screen.dart  Profile Settings: photo, name, email, bio, pronoun, Sign out
@@ -117,6 +125,7 @@ CMPE137Project/
 │   │       ├── leave_guard.dart        lets an editor ask "Discard changes?" when a nav bar tab is tapped
 │   │       ├── profile_avatar.dart     round profile photo with the default silhouette
 │   │       ├── star_rating.dart        five stars in half steps, read-only or tap/drag to rate
+│   │       ├── review_card.dart        one review in a list (spoilers hidden)
 │   │       ├── mood_chip.dart          a mood as a chip in that mood's theme colors
 │   │       ├── dates.dart              "Nov 8, 2026" style dates
 │   │       ├── action_colors.dart      Favorite orange, Watchlist blue
@@ -157,7 +166,8 @@ CMPE137Project/
     │   ├── update_vote_rule.sql        switches an older database to the vote-count rules
     │   ├── update_profile.sql          adds pronoun + Greatest Of All Time to an existing database
     │   ├── update_details.sql          adds backdrop + original name to an existing database
-    │   └── update_reviews.sql          adds Favorites (list kinds) to an existing database
+    │   ├── update_reviews.sql          adds Favorites (list kinds) to an existing database
+    │   └── update_comments.sql         adds review likes, comments and comment likes
     ├── lib/
     │   ├── db.dart                     MySQL connection pool
     │   ├── auth/
@@ -173,6 +183,7 @@ CMPE137Project/
     │   │   ├── list_dao.dart           your lists: create, edit, reorder, delete
     │   │   ├── mood_dao.dart
     │   │   ├── profile_dao.dart        profile fields, Greatest Of All Time, avatar
+    │   │   ├── review_dao.dart         reviews, likes, comments, and similar titles
     │   │   ├── session_dao.dart
     │   │   ├── title_dao.dart          includes Discovery and mood-page shuffles
     │   │   ├── user_dao.dart
@@ -186,6 +197,7 @@ CMPE137Project/
     │   ├── models/
     │   │   ├── mood.dart               Mood, TitleMood, TitleMoods
     │   │   ├── profile.dart
+    │   │   ├── review.dart             Review, ReviewComment, Author
     │   │   ├── title.dart
     │   │   ├── title_entry.dart        one user's review and log of a title
     │   │   ├── user.dart
@@ -230,10 +242,23 @@ CMPE137Project/
     │   │   ├── _middleware.dart
     │   │   ├── index.dart              GET /moods
     │   │   └── [id]/titles.dart        GET /moods/:id/titles
+    │   ├── reviews/
+    │   │   ├── _middleware.dart
+    │   │   └── [id]/
+    │   │       ├── index.dart          GET /reviews/:id (with its comments)
+    │   │       ├── like.dart           PUT, DELETE /reviews/:id/like
+    │   │       └── comments.dart       POST /reviews/:id/comments
+    │   ├── comments/
+    │   │   ├── _middleware.dart
+    │   │   └── [id]/
+    │   │       ├── index.dart          DELETE /comments/:id
+    │   │       └── like.dart           PUT, DELETE /comments/:id/like
     │   ├── titles/
     │   │   ├── _middleware.dart
     │   │   └── [id]/
     │   │       ├── index.dart          GET /titles/:id
+    │   │       ├── similar.dart        GET /titles/:id/similar
+    │   │       ├── reviews.dart        GET /titles/:id/reviews
     │   │       └── votes/
     │   │           ├── index.dart      GET /titles/:id/votes
     │   │           └── [moodId].dart   PUT and DELETE /titles/:id/votes/:moodId
@@ -256,7 +281,7 @@ Follow [server/README.md](server/README.md), then [server/bin/README_SQL.md](ser
 1. Run `db/schema.sql` in Workbench to create the tables. **This wipes all data**, so only do it for a fresh database.
 2. Import titles from TMDB, from `server/`:
    ```
-   dart run bin/import_tmdb.dart --pages 1
+   dart run bin/import_tmdb.dart --pages <number> (20 is ideal)
    ```
 3. Run `db/seed_moods.sql` in Workbench **once** to add the moods.
 
@@ -267,23 +292,6 @@ You're done when http://localhost:8080/health shows:
 ```
 
 **More titles:** run the importer again with more pages, for example `--pages 5`. It adds new titles without duplicates, keeps votes and accounts, and refreshes the moods by itself. You don't need `seed_moods.sql` again unless you wiped the database or changed the moods.
-
-### Updating an existing database
-
-`schema.sql` always has the full, current design, but running it wipes everything. If you already have data, run these update scripts instead. Each keeps your data and is safe to run twice:
-
-| Script | Run it if | How to check |
-|---|---|---|
-| `db/update_vote_rule.sql` | your database is from before November 18 | `SHOW COLUMNS FROM title_moods LIKE 'is_confirmed';` returns a row |
-| `db/update_profile.sql` | your database is from before November 25 (profile page) | `SHOW TABLES LIKE 'goat_picks';` returns nothing |
-| `db/update_details.sql` | your database is from before November 26 (new details page) | `SHOW COLUMNS FROM titles LIKE 'backdrop_url';` returns nothing |
-| `db/update_reviews.sql` | your database is from before the reviews and Favorites update | `SHOW COLUMNS FROM watchlists LIKE 'kind';` returns nothing |
-
-Lists, reviews, ratings and logs need no update script of their own; their tables were already there. Favorites need `update_reviews.sql`.
-
-After `update_details.sql`, run the importer again (`dart run bin/import_tmdb.dart`) so the titles you already have get their backdrop and original-language name. It updates titles in place and keeps votes, lists and accounts.
-
-After pulling server changes, **restart `dart_frog dev`** (Ctrl+C, then run it again). New routes, and the `public/` folder for photos, are only picked up when it starts.
 
 ## 2. Set up the Flutter app
 
