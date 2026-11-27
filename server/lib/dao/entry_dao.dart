@@ -19,7 +19,8 @@ SELECT stars, DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') AS changed
 FROM ratings WHERE user_id = :user AND title_id = :title''';
 
   static const _review = '''
-SELECT body, is_spoiler, DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') AS changed
+SELECT review_id, body, is_spoiler,
+        DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') AS changed
 FROM reviews WHERE user_id = :user AND title_id = :title''';
 
   static const _log = '''
@@ -81,6 +82,10 @@ WHERE title_id = :title''';
         for (final row in moods.rows) int.parse(row.colByName('mood_id')!),
       ],
       updatedAt: changed.isEmpty ? null : changed.last,
+      reviewId: switch (v?.colByName('review_id')) {
+        final String id => int.parse(id),
+        _ => null,
+      },
     );
   }
 
