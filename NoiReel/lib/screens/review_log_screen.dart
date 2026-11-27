@@ -288,11 +288,18 @@ class _ReviewLogScreenState extends State<ReviewLogScreen> {
                     child: Row(
                       children: [
                         Text('Date', style: text.bodyLarge),
-                        const Spacer(),
-                        Text(
-                          date == null ? 'Add date' : formatDateWithDay(date),
-                          style: text.bodyLarge?.copyWith(
-                            color: date == null ? muted : null,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            date == null
+                                ? 'Add date'
+                                : formatDateWithDay(date),
+                            textAlign: TextAlign.right,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.bodyLarge?.copyWith(
+                              color: date == null ? muted : null,
+                            ),
                           ),
                         ),
                         if (date != null)

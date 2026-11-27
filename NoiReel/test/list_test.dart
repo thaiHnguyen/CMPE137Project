@@ -45,8 +45,13 @@ class FakeServer {
       };
 
   late final client = MockClient((req) async {
-    http.Response json(int status, Object body) =>
-        http.Response(jsonEncode(body), status);
+    // UTF-8 with a charset, like the real server (the default is
+    // Latin-1, which can't hold titles like 菊次郎の夏)
+    http.Response json(int status, Object body) => http.Response.bytes(
+      utf8.encode(jsonEncode(body)),
+      status,
+      headers: {'content-type': 'application/json; charset=utf-8'},
+    );
     final path = req.url.path;
 
     if (path.startsWith('/me/')) {

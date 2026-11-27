@@ -215,15 +215,21 @@ class _MyReviewScreenState extends State<MyReviewScreen> {
                                   StarRating(value: entry.stars, size: 22),
                                 if (_status.favorite) ...[
                                   const SizedBox(width: 6),
-                                  Icon(
-                                    Icons.favorite,
-                                    size: 20,
-                                    color: activeActionColor(
-                                      context,
-                                      background:
-                                          theme.scaffoldBackgroundColor,
+                                  // Its own screen-reader node, so it's
+                                  // read out next to the stars
+                                  Semantics(
+                                    container: true,
+                                    label: 'In your Favorites',
+                                    excludeSemantics: true,
+                                    child: Icon(
+                                      Icons.favorite,
+                                      size: 20,
+                                      color: activeActionColor(
+                                        context,
+                                        background:
+                                            theme.scaffoldBackgroundColor,
+                                      ),
                                     ),
-                                    semanticLabel: 'In your Favorites',
                                   ),
                                 ],
                               ],

@@ -35,7 +35,9 @@ class _MoodRowState extends State<MoodRow> {
 
   Future<TitlePage> _load() => widget.api.getMoodTitles(widget.mood.id);
 
-  void _retry() => setState(() => _titles = _load());
+  void _retry() => setState(() {
+    _titles = _load();
+  });
 
   @override
   Widget build(BuildContext context) {

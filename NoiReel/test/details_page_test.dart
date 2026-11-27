@@ -133,8 +133,13 @@ class FakeServer {
   };
 
   late final client = MockClient((req) async {
-    http.Response json(int status, Object body) =>
-        http.Response(jsonEncode(body), status);
+    // UTF-8 with a charset, like the real server (the default is
+    // Latin-1, which can't hold titles like 菊次郎の夏)
+    http.Response json(int status, Object body) => http.Response.bytes(
+      utf8.encode(jsonEncode(body)),
+      status,
+      headers: {'content-type': 'application/json; charset=utf-8'},
+    );
     switch ('${req.method} ${req.url.path}') {
       case 'GET /me/titles/7':
         return json(200, _status);
@@ -263,10 +268,30 @@ void main() {
     await pumpDetails(tester);
 
     expect(find.text('Brash, loudmouthed and opportunistic.'), findsOneWidget);
-    expect(find.text('Calm'), findsWidgets); // tag and vote bar
+    expect(find.text('Calm'), findsOneWidget); // the primary mood tag
     expect(find.text('RATINGS'), findsOneWidget);
     expect(find.text('No ratings yet.'), findsOneWidget);
     expect(find.text('–'), findsOneWidget);
+  });
+
+  testWidgets('Show votes puts vote counts on the mood tags',
+      (tester) async {
+    await pumpDetails(tester);
+
+    expect(find.text('Show votes'), findsOneWidget);
+    expect(find.bySemanticsLabel('Calm, 2 votes'), findsNothing);
+
+    await tester.tap(find.text('Show votes'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hide votes'), findsOneWidget);
+    expect(find.text('MOODS ACCORDING TO 3 VOTERS'), findsOneWidget);
+    expect(find.bySemanticsLabel('Calm, 2 votes'), findsOneWidget);
+    expect(find.bySemanticsLabel('Happy, 1 vote'), findsOneWidget);
+
+    await tester.tap(find.text('Hide votes'));
+    await tester.pumpAndSettle();
+    expect(find.text('MOODS ACCORDING TO 3 VOTERS'), findsNothing);
+    expect(find.bySemanticsLabel('Calm'), findsOneWidget);
   });
 
   testWidgets('Ratings shows the average and count', (tester) async {

@@ -20,7 +20,7 @@ import 'review_log_screen.dart';
 /// Letterboxd's: a wide still fading into the page, round Back and 3 dots
 /// buttons over it, then the name, original name, year, director and
 /// length beside the poster (tap it to zoom), the overview, mood tags,
-/// and the Ratings chart. Community votes, cast and genres follow.
+/// and the Ratings chart. Cast and genres follow.
 /// Empty fields are hidden (GU-03.04)
 class TitleDetailsScreen extends StatefulWidget {
   /// Creates the details page for [title]
@@ -38,7 +38,9 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
 
   Future<TitleDetails> _load() => widget.api.getTitle(widget.title.id);
 
-  void _retry() => setState(() => _details = _load());
+  void _retry() => setState(() {
+    _details = _load();
+  });
 
   void _snack(String message) {
     if (!mounted) return;
@@ -299,34 +301,12 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
         _Centered(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                _MoodTag(mood: primary, isPrimary: true),
-                for (final m in details.secondaryMoods) _MoodTag(mood: m),
-              ],
-            ),
+            child: _MoodSection(details: details),
           ),
         ),
       const SizedBox(height: 28),
       const _FullDivider(),
       _Panel(title: 'Ratings', child: _RatingsChart(details: details)),
-      if (details.votes.isNotEmpty) ...[
-        const _FullDivider(),
-        _Panel(
-          title: 'Community moods',
-          trailing:
-              '${details.voters} ${details.voters == 1 ? 'voter' : 'voters'}',
-          child: Column(
-            children: [
-              for (final v in details.votes)
-                _VoteBar(mood: v, topVotes: details.votes.first.votes),
-            ],
-          ),
-        ),
-      ],
       if (details.cast.isNotEmpty) ...[
         const _FullDivider(),
         _Panel(title: 'Cast', child: _CastList(cast: details.cast)),
@@ -994,12 +974,11 @@ class _FullDivider extends StatelessWidget {
 }
 
 /// A section under a divider: a small spaced-out caption ("RATINGS"),
-/// optional text on the right, then its content
+/// then its content
 class _Panel extends StatelessWidget {
-  const _Panel({required this.title, required this.child, this.trailing});
+  const _Panel({required this.title, required this.child});
 
   final String title;
-  final String? trailing;
   final Widget child;
 
   @override
@@ -1016,12 +995,7 @@ class _Panel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(child: Text(title.toUpperCase(), style: caption)),
-                if (trailing != null) Text(trailing!, style: caption),
-              ],
-            ),
+            Text(title.toUpperCase(), style: caption),
             const SizedBox(height: 16),
             child,
           ],
@@ -1247,17 +1221,88 @@ class _GenreChip extends StatelessWidget {
   }
 }
 
-/// A mood tag in that mood theme's own header colors
+/// The mood tags under the overview, with a small "Show votes" button
+class _MoodSection extends StatelessWidget {
+  const _MoodSection({required this.details});
+
+  final TitleDetails details;
+
+  /// Shared by every details page, so the choice carries over
+  static final showVotes = ValueNotifier<bool>(false);
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final bodyText = Theme.of(context).colorScheme.onSurface;
+    final voters = details.voters;
+    final tags = [details.primaryMood!, ...details.secondaryMoods];
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: showVotes,
+      builder: (context, show, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topLeft,
+            child: show
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Text(
+                      voters == 0
+                          ? 'NO VOTES YET  ·  THESE MOODS COME FROM THE '
+                                'GENRES'
+                          : 'MOODS ACCORDING TO $voters '
+                                '${voters == 1 ? 'VOTER' : 'VOTERS'}',
+                      style: text.labelMedium?.copyWith(
+                        letterSpacing: 1.2,
+                        color: bodyText.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+          Wrap(
+            // Extra room above so the badges don't touch the row above
+            spacing: 10,
+            runSpacing: show ? 16 : 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              for (final (i, m) in tags.indexed)
+                _MoodTag(mood: m, isPrimary: i == 0, showVotes: show),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _ShowVotesButton(
+            on: show,
+            onPressed: () => showVotes.value = !show,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A mood tag in that mood theme's own header colors. With [showVotes],
+/// a small badge on its top-right corner shows its vote count
 class _MoodTag extends StatelessWidget {
-  const _MoodTag({required this.mood, this.isPrimary = false});
+  const _MoodTag({
+    required this.mood,
+    this.isPrimary = false,
+    this.showVotes = false,
+  });
 
   final TitleMood mood;
   final bool isPrimary; // The primary tag is bigger
+  final bool showVotes;
 
   @override
   Widget build(BuildContext context) {
     final palette = NoiReelPalette.byName(mood.name);
-    return Container(
+    final theme = Theme.of(context);
+
+    final tag = Container(
       padding: EdgeInsets.symmetric(
         horizontal: isPrimary ? 16 : 12,
         vertical: isPrimary ? 8 : 5,
@@ -1276,63 +1321,116 @@ class _MoodTag extends StatelessWidget {
         ),
       ),
     );
-  }
-}
 
-/// One row of the vote results: mood name, a bar, and the vote count
-class _VoteBar extends StatelessWidget {
-  const _VoteBar({required this.mood, required this.topVotes});
-
-  final TitleMood mood;
-  final int topVotes; // Votes of the most-voted mood
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final bodyText = Theme.of(context).colorScheme.onSurface;
-    final palette = NoiReelPalette.byName(mood.name);
-    final share = topVotes == 0 ? 0.0 : mood.votes / topVotes;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+    final votes = mood.votes;
+    return Semantics(
+      container: true,
+      label: showVotes
+          ? '${mood.name}, $votes ${votes == 1 ? 'vote' : 'votes'}'
+          : mood.name,
+      excludeSemantics: true,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              mood.name,
-              style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-          Expanded(
-            child: Container(
-              height: 16,
-              decoration: BoxDecoration(
-                color: bodyText.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              alignment: Alignment.centerLeft,
-              child: FractionallySizedBox(
-                widthFactor: share.clamp(0.04, 1.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: palette.navBar,
-                    border: Border.all(color: palette.swatchBorder, width: 2),
-                    borderRadius: BorderRadius.circular(8),
+          tag,
+          Positioned(
+            top: -10,
+            right: -8,
+            child: AnimatedScale(
+              scale: showVotes ? 1 : 0,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutBack,
+              // The badge is in the page's colors, flipped, so it stands
+              // out on any theme and any mood color
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 24),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onSurface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: theme.scaffoldBackgroundColor,
+                    width: 1.5,
+                  ),
+                ),
+                child: Text(
+                  '$votes',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: theme.scaffoldBackgroundColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
             ),
           ),
-          SizedBox(
-            width: 52,
-            child: Text(
-              '${mood.votes}',
-              textAlign: TextAlign.right,
-              style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Show votes" / "Hide votes" under the mood tags. 
+/// Off: outlined in the theme's text color
+/// On: filled with the theme's button color 
+class _ShowVotesButton extends StatelessWidget {
+  const _ShowVotesButton({required this.on, required this.onPressed});
+
+  final bool on;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final background = theme.scaffoldBackgroundColor;
+    final fill = activeActionColor(context, background: background);
+    // Text on the fill: the button's own text color, or the page color
+    final onFill = fill == colors.primary ? colors.onPrimary : background;
+    final fg = on ? onFill : colors.onSurface;
+
+    return Semantics(
+      button: true,
+      toggled: on,
+      label: 'Show votes',
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          customBorder: const StadiumBorder(),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            decoration: ShapeDecoration(
+              color: on ? fill : Colors.transparent,
+              shape: StadiumBorder(
+                side: BorderSide(
+                  color: on ? fill : colors.onSurface.withValues(alpha: 0.45),
+                  width: 1.5,
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.bar_chart_rounded, size: 18, color: fg),
+                const SizedBox(width: 6),
+                Text(
+                  on ? 'Hide votes' : 'Show votes',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: fg,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
