@@ -64,9 +64,15 @@ class StarRating extends StatelessWidget {
               '${value == 1 ? 'star' : 'stars'}';
 
     if (onChanged == null) {
-      return Semantics(label: label, excludeSemantics: true, child: stars);
+      return Semantics(
+        container: true,
+        label: label,
+        excludeSemantics: true,
+        child: stars,
+      );
     }
     return Semantics(
+      container: true,
       label: 'Rating',
       value: label,
       increasedValue: 'Higher',

@@ -96,7 +96,9 @@ class _ListDetailScreenState extends State<ListDetailScreen> {
 
   Future<void> _refresh() async {
     final list = _load();
-    setState(() => _list = list);
+    setState(() {
+      _list = list;
+    });
     await list.catchError((_) => const UserListDetails(id: 0, name: ''));
   }
 

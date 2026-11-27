@@ -397,7 +397,8 @@ class ApiClient {
       throw ApiException("Can't reach the server. Is dart_frog dev running?");
     }
 
-    final json = _decode(res.body);
+    // The server always sends UTF-8
+    final json = _decode(utf8.decode(res.bodyBytes, allowMalformed: true));
     final map = json is Map<String, dynamic> ? json : <String, dynamic>{};
     if (res.statusCode >= 200 && res.statusCode < 300) return map;
 

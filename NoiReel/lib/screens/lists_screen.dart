@@ -351,7 +351,9 @@ class _CollectionViewState extends State<CollectionView> {
       ),
     );
     if (saved == null || !mounted) return;
-    setState(() => _list = Future.value(saved));
+    setState(() {
+      _list = Future.value(saved);
+    });
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
