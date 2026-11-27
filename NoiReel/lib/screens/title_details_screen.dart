@@ -242,7 +242,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
                     SliverList.list(
                       children: [
                         for (final (i, section)
-                            in _sections(details!).indexed)
+                        in _sections(details!).indexed)
                           FadeSlideIn.staggered(
                             index: i,
                             step: const Duration(milliseconds: 80),
@@ -332,12 +332,15 @@ class _Centered extends StatelessWidget {
 
   final Widget child;
 
+  // Full width up to 720, so every section starts at the same left edge.
+  // Without the SizedBox, a section only as wide as its content (like a
+  // few genre chips) would be centered instead of lined up on the left
   @override
   Widget build(BuildContext context) => Align(
     alignment: Alignment.topCenter,
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 720),
-      child: child,
+      child: SizedBox(width: double.infinity, child: child),
     ),
   );
 }
@@ -365,18 +368,18 @@ class _Backdrop extends StatelessWidget {
     final height = (width * 9 / 16).clamp(200.0, 340.0);
     final Widget image = url != null
         ? Image.network(
-            url,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => const SizedBox.shrink(),
-          )
+      url,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+    )
         : ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: Image.network(
-              fallback!,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            ),
-          );
+      imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+      child: Image.network(
+        fallback!,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+      ),
+    );
 
     return SizedBox(
       height: height,
@@ -498,8 +501,8 @@ class _ActionSheetState extends State<_ActionSheet> {
   void _choose(_Action action) {
     final needsAccount = action != _Action.poster;
     Navigator.pop<_SheetChoice>(context, (
-      action: !widget.signedIn && needsAccount ? _Action.signIn : action,
-      status: _status,
+    action: !widget.signedIn && needsAccount ? _Action.signIn : action,
+    status: _status,
     ));
   }
 
@@ -887,7 +890,7 @@ class _PosterViewerState extends State<_PosterViewer>
     final target = zoomedIn
         ? Matrix4.identity()
         : (Matrix4.translationValues(-at.dx * 1.5, -at.dy * 1.5, 0)
-            ..multiply(Matrix4.diagonal3Values(2.5, 2.5, 1)));
+      ..multiply(Matrix4.diagonal3Values(2.5, 2.5, 1)));
     _zoomAnimation = Matrix4Tween(begin: _zoom.value, end: target).animate(
       CurvedAnimation(parent: _animation, curve: Curves.easeOutCubic),
     );
@@ -1043,7 +1046,7 @@ class _RatingsChart extends StatelessWidget {
                       Expanded(
                         child: Tooltip(
                           message:
-                              '$n ${n == 1 ? 'rating' : 'ratings'} of '
+                          '$n ${n == 1 ? 'rating' : 'ratings'} of '
                               '${_stars(i)}',
                           child: Container(
                             margin: const EdgeInsets.symmetric(horizontal: 1),
@@ -1051,9 +1054,9 @@ class _RatingsChart extends StatelessWidget {
                             height: most == 0
                                 ? 2
                                 : (n / most * _barsHeight).clamp(
-                                    2.0,
-                                    _barsHeight,
-                                  ),
+                              2.0,
+                              _barsHeight,
+                            ),
                             decoration: BoxDecoration(
                               color: bodyText.withValues(alpha: 0.3),
                               borderRadius: const BorderRadius.vertical(
@@ -1145,7 +1148,7 @@ class _ListPicker extends StatelessWidget {
                 padding: EdgeInsets.all(24),
                 child: Text(
                   "You haven't made any lists yet. Make one from the List "
-                  'tab on your Profile.',
+                      'tab on your Profile.',
                   textAlign: TextAlign.center,
                 ),
               );
@@ -1165,7 +1168,7 @@ class _ListPicker extends StatelessWidget {
                         ),
                         subtitle: Text(
                           '${list.entryCount} '
-                          '${list.entryCount == 1 ? 'entry' : 'entries'}',
+                              '${list.entryCount == 1 ? 'entry' : 'entries'}',
                         ),
                         onTap: () => Navigator.pop(context, list),
                       ),
@@ -1248,19 +1251,19 @@ class _MoodSection extends StatelessWidget {
             alignment: Alignment.topLeft,
             child: show
                 ? Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: Text(
-                      voters == 0
-                          ? 'NO VOTES YET  ·  THESE MOODS COME FROM THE '
-                                'GENRES'
-                          : 'MOODS ACCORDING TO $voters '
-                                '${voters == 1 ? 'VOTER' : 'VOTERS'}',
-                      style: text.labelMedium?.copyWith(
-                        letterSpacing: 1.2,
-                        color: bodyText.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  )
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Text(
+                voters == 0
+                    ? 'NO VOTES YET  ·  THESE MOODS COME FROM THE '
+                    'GENRES'
+                    : 'MOODS ACCORDING TO $voters '
+                    '${voters == 1 ? 'VOTER' : 'VOTERS'}',
+                style: text.labelMedium?.copyWith(
+                  letterSpacing: 1.2,
+                  color: bodyText.withValues(alpha: 0.8),
+                ),
+              ),
+            )
                 : const SizedBox(width: double.infinity),
           ),
           Wrap(
