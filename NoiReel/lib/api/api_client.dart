@@ -246,6 +246,106 @@ class ApiClient {
     return UserListDetails.fromJson(json['list'] as Map<String, dynamic>);
   }
 
+  /// `GET /titles/:id/similar`: titles with a similar mood, most alike
+  /// first
+  Future<TitlePage> getSimilar(
+    int titleId, {
+    int page = 1,
+    int limit = 30,
+  }) async {
+    final json = await _send(
+      'GET',
+      '/titles/$titleId/similar',
+      query: {'page': '$page', 'limit': '$limit'},
+    );
+    return TitlePage.fromJson(json);
+  }
+
+  /// `GET /titles/:id/reviews`: a title's reviews, most liked first.
+  /// With [mine], just the logged-in user's own. [token] is optional;
+  /// with it, each review says whether you liked it
+  Future<ReviewPage> getReviews(
+    int titleId, {
+    String? token,
+    bool mine = false,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final json = await _send(
+      'GET',
+      '/titles/$titleId/reviews',
+      token: token,
+      query: {
+        'page': '$page',
+        'limit': '$limit',
+        if (mine) 'mine': '1',
+      },
+    );
+    return ReviewPage.fromJson(json);
+  }
+
+  /// `GET /reviews/:id`: one review and its comments, oldest first
+  Future<({Review review, List<ReviewComment> comments})> getReview(
+    int reviewId, {
+    String? token,
+  }) async {
+    final json = await _send('GET', '/reviews/$reviewId', token: token);
+    return (
+      review: Review.fromJson(json['review'] as Map<String, dynamic>),
+      comments: [
+        for (final c in json['comments'] as List<dynamic>)
+          ReviewComment.fromJson(c as Map<String, dynamic>),
+      ],
+    );
+  }
+
+  /// `PUT` or `DELETE /reviews/:id/like`
+  Future<({int count, bool mine})> setReviewLike(
+    String token,
+    int reviewId, {
+    required bool like,
+  }) async {
+    final json = await _send(
+      like ? 'PUT' : 'DELETE',
+      '/reviews/$reviewId/like',
+      token: token,
+    );
+    return (count: json['likeCount'] as int, mine: json['likedByMe'] as bool);
+  }
+
+  /// `POST /reviews/:id/comments`: adds a comment
+  Future<ReviewComment> addComment(
+    String token,
+    int reviewId,
+    String body,
+  ) async {
+    final json = await _send(
+      'POST',
+      '/reviews/$reviewId/comments',
+      token: token,
+      body: {'body': body},
+    );
+    return ReviewComment.fromJson(json['comment'] as Map<String, dynamic>);
+  }
+
+  /// `DELETE /comments/:id`: deletes one of your comments
+  Future<void> deleteComment(String token, int commentId) =>
+      _send('DELETE', '/comments/$commentId', token: token);
+
+  /// `PUT` or `DELETE /comments/:id/like`
+  Future<({int count, bool mine})> setCommentLike(
+    String token,
+    int commentId, {
+    required bool like,
+  }) async {
+    final json = await _send(
+      like ? 'PUT' : 'DELETE',
+      '/comments/$commentId/like',
+      token: token,
+    );
+    return (count: json['likeCount'] as int, mine: json['likedByMe'] as bool);
+  }
+
   /// Full address of a file the server hosts, such as an avatar path
   /// (`/avatars/7-123.jpg`). Full URLs are returned as they are
   String mediaUrl(String path) =>
