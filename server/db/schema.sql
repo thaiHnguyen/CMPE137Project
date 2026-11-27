@@ -32,6 +32,7 @@ DROP PROCEDURE IF EXISTS refresh_title_moods;
 
 DROP TABLE IF EXISTS engagement_events, moderation_actions, reports,
   collection_items, collections, seed_moods, seed_titles, not_interested,
+  comment_likes, review_comments, review_likes,
   goat_picks, watch_logs, watchlist_items, watchlists, reviews, ratings,
   private_tags, user_mood_tags, title_moods, genre_moods, mood_counters,
   moods, title_credits, people, title_genres, genres, titles,
@@ -312,6 +313,43 @@ CREATE TABLE reviews (
   KEY idx_review_title_date (title_id, status, created_at),  -- GU-04.02 sort newest
   CONSTRAINT fk_review_user  FOREIGN KEY (user_id)  REFERENCES registered_users (user_id) ON DELETE CASCADE,
   CONSTRAINT fk_review_title FOREIGN KEY (title_id) REFERENCES titles (title_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Likes on a review (one per user). Counted for "Popular reviews"
+CREATE TABLE review_likes (
+  review_id  BIGINT UNSIGNED NOT NULL,
+  user_id    BIGINT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (review_id, user_id),
+  KEY idx_rl_user (user_id),
+  CONSTRAINT fk_rl_review FOREIGN KEY (review_id) REFERENCES reviews (review_id) ON DELETE CASCADE,
+  CONSTRAINT fk_rl_user   FOREIGN KEY (user_id)   REFERENCES registered_users (user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Comments under a review, oldest first
+CREATE TABLE review_comments (
+  comment_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  review_id  BIGINT UNSIGNED NOT NULL,
+  user_id    BIGINT UNSIGNED NOT NULL,
+  body       VARCHAR(2000) NOT NULL,
+  status     ENUM('visible','hidden') NOT NULL DEFAULT 'visible',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (comment_id),
+  KEY idx_rc_review (review_id, status, created_at),
+  KEY idx_rc_user (user_id),
+  CONSTRAINT fk_rc_review FOREIGN KEY (review_id) REFERENCES reviews (review_id) ON DELETE CASCADE,
+  CONSTRAINT fk_rc_user   FOREIGN KEY (user_id)   REFERENCES registered_users (user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Likes on a comment (one per user)
+CREATE TABLE comment_likes (
+  comment_id BIGINT UNSIGNED NOT NULL,
+  user_id    BIGINT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (comment_id, user_id),
+  KEY idx_cl_user (user_id),
+  CONSTRAINT fk_cl_comment FOREIGN KEY (comment_id) REFERENCES review_comments (comment_id) ON DELETE CASCADE,
+  CONSTRAINT fk_cl_user    FOREIGN KEY (user_id)    REFERENCES registered_users (user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE watchlists (
