@@ -51,6 +51,64 @@ class FakeServer {
     };
   }
 
+  // Reviews of Kikujiro: 11 by Zoe, 12 a spoiler by Lauren, 13 the user's
+  final reviewLikes = <String>[]; // "PUT 11", "DELETE 11"
+  final commentLikes = <String>[];
+  final postedComments = <String>[];
+  var zoeLikes = 3;
+  var zoeLikedByMe = false;
+
+  Map<String, Object?> review(int id) {
+    final (name, body, spoiler, mine) = switch (id) {
+      11 => ('Zoe', 'Funny and sad at once.', false, false),
+      12 => ('Lauren', 'The ending reveals the mother.', true, false),
+      _ => ('thai', 'My own take.', true, true),
+    };
+    return {
+      'reviewId': id,
+      'author': {
+        'userId': id,
+        'username': name.toLowerCase(),
+        'displayName': name,
+        'avatarUrl': null,
+      },
+      'title': card(7)..['name'] = 'Kikujiro',
+      'body': body,
+      'spoiler': spoiler,
+      'edited': false,
+      'createdAt': 1790000000,
+      'stars': 4.5,
+      'watchedOn': '2026-11-08',
+      'favorite': id == 11,
+      'likeCount': id == 11 ? zoeLikes : 0,
+      'commentCount': id == 11 ? 1 + postedComments.length : 0,
+      'likedByMe': id == 11 && zoeLikedByMe,
+      'isMine': mine,
+    };
+  }
+
+  List<Map<String, Object?>> get comments => [
+    {
+      'commentId': 21,
+      'author': {'userId': 30, 'username': 'pot', 'displayName': 'Potsticker'},
+      'body': '10000%.',
+      'createdAt': 1790000000,
+      'likeCount': commentLikes.where((l) => l == 'PUT').length,
+      'likedByMe': commentLikes.isNotEmpty && commentLikes.last == 'PUT',
+      'isMine': false,
+    },
+    for (final (i, body) in postedComments.indexed)
+      {
+        'commentId': 100 + i,
+        'author': {'userId': 1, 'username': 'thai'},
+        'body': body,
+        'createdAt': 1790000000,
+        'likeCount': 0,
+        'likedByMe': false,
+        'isMine': true,
+      },
+  ];
+
   Map<String, Object?> card(int id) => {
     'titleId': id,
     'type': 'movie',
@@ -182,6 +240,43 @@ class FakeServer {
             'goat': [null, null, null, null, null],
           },
         });
+      case 'GET /titles/7/similar':
+        return json(200, {
+          'page': 1,
+          'limit': 30,
+          'total': 2,
+          'titles': [card(1), card(2)],
+        });
+      case 'GET /titles/7/reviews':
+        final mine = req.url.queryParameters['mine'] == '1';
+        final ids = mine
+            ? (req.headers['Authorization'] == null ? <int>[] : [13])
+            : [11, 12, 13];
+        return json(200, {
+          'page': 1,
+          'limit': 5,
+          'total': ids.length,
+          'reviews': [for (final id in ids) review(id)],
+        });
+      case 'GET /reviews/11' || 'GET /reviews/12':
+        final id = int.parse(req.url.pathSegments[1]);
+        return json(200, {
+          'review': review(id),
+          'comments': id == 11 ? comments : <Object>[],
+        });
+      case 'PUT /reviews/11/like' || 'DELETE /reviews/11/like':
+        reviewLikes.add('${req.method} 11');
+        zoeLikedByMe = req.method == 'PUT';
+        zoeLikes += zoeLikedByMe ? 1 : -1;
+        return json(200, {'likeCount': zoeLikes, 'likedByMe': zoeLikedByMe});
+      case 'PUT /comments/21/like' || 'DELETE /comments/21/like':
+        commentLikes.add(req.method);
+        final liked = req.method == 'PUT';
+        return json(200, {'likeCount': liked ? 1 : 0, 'likedByMe': liked});
+      case 'POST /reviews/11/comments':
+        final body = (jsonDecode(req.body) as Map)['body'] as String;
+        postedComments.add(body);
+        return json(201, {'comment': comments.last});
       case 'GET /titles/7':
         return json(200, _kikujiro);
       case 'GET /titles/8':
@@ -238,12 +333,15 @@ void main() {
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
+    // AuthScope goes above MaterialApp, like the app's shell puts it above
+    // the tab's Navigator, so pages opened from the details page (a
+    // review, Add Comment) can find who's logged in too
     await tester.pumpWidget(
-      MaterialApp(
-        theme: NoiReelPalette.defaultTheme.toThemeData(),
-        home: AuthScope(
-          auth: AuthController(server.api, session),
-          child: TitleDetailsScreen(api: server.api, title: title),
+      AuthScope(
+        auth: AuthController(server.api, session),
+        child: MaterialApp(
+          theme: NoiReelPalette.defaultTheme.toThemeData(),
+          home: TitleDetailsScreen(api: server.api, title: title),
         ),
       ),
     );
@@ -251,15 +349,16 @@ void main() {
     return server;
   }
 
-  testWidgets('header: name, original name, year, director, length',
+  testWidgets('header: poster, name, original name, then one facts line',
       (tester) async {
     await pumpDetails(tester);
 
     expect(find.text('Kikujiro'), findsOneWidget);
     expect(find.text('菊次郎の夏'), findsOneWidget);
-    expect(find.text('1999  ·  DIRECTED BY'), findsOneWidget);
-    expect(find.text('Takeshi Kitano'), findsOneWidget);
-    expect(find.text('2h 1m'), findsOneWidget);
+    expect(
+      find.text('1999  ·  Directed by: Takeshi Kitano  ·  2h 1m'),
+      findsOneWidget,
+    );
     expect(find.byTooltip('Back'), findsOneWidget);
     expect(find.byTooltip('More options'), findsOneWidget);
   });
@@ -268,6 +367,7 @@ void main() {
     await pumpDetails(tester);
 
     expect(find.text('Brash, loudmouthed and opportunistic.'), findsOneWidget);
+    expect(find.text('MOOD TAGS'), findsOneWidget);
     expect(find.text('Calm'), findsOneWidget); // the primary mood tag
     expect(find.text('RATINGS'), findsOneWidget);
     expect(find.text('No ratings yet.'), findsOneWidget);
@@ -313,9 +413,13 @@ void main() {
       title: const TitleCard(id: 8, type: 'tv', name: 'Series', year: 2019),
     );
 
-    expect(find.text('2019  ·  CREATED BY'), findsOneWidget);
-    expect(find.text('A Creator'), findsOneWidget);
-    expect(find.text('2 seasons  ·  16 episodes  ·  45m each'), findsOneWidget);
+    expect(
+      find.text(
+        '2019  ·  Created by: A Creator  ·  '
+        '2 seasons  ·  16 episodes  ·  45m each',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('RATINGS'), findsOneWidget);
   });
 
@@ -577,6 +681,150 @@ void main() {
       expect(find.text('Not for me.'), findsOneWidget);
       expect(find.textContaining('Rated 2 stars'), findsOneWidget);
       expect(find.text('Add date'), findsOneWidget);
+    });
+  });
+
+  group('Similar mood and reviews', () {
+    Future<void> scrollTo(WidgetTester tester, Finder finder) async {
+      await tester.scrollUntilVisible(
+        finder,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('Similar mood opens a grid of titles', (tester) async {
+      await pumpDetails(tester);
+      await scrollTo(tester, find.text('Similar mood'));
+
+      await tester.tap(find.text('Similar mood'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Titles that feel like'), findsOneWidget);
+      expect(find.text('2 titles'), findsOneWidget);
+    });
+
+    testWidgets('Popular reviews, with spoilers hidden', (tester) async {
+      await pumpDetails(tester, session: _user);
+      await scrollTo(tester, find.text('POPULAR REVIEWS'));
+      await scrollTo(tester, find.text('Funny and sad at once.'));
+
+      expect(find.text('Zoe'), findsOneWidget);
+      expect(find.text('3 likes  ·  1 comment'), findsOneWidget);
+      // Lauren's spoiler review is hidden; the user's own isn't
+      expect(find.text('The ending reveals the mother.'), findsNothing);
+      expect(find.textContaining('may contain spoilers'), findsOneWidget);
+    });
+
+    testWidgets('the You tab shows your own review', (tester) async {
+      await pumpDetails(tester, session: _user);
+      await scrollTo(tester, find.text('POPULAR REVIEWS'));
+
+      await tester.tap(find.text('You'));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.text('My own take.'));
+
+      expect(find.text('YOUR REVIEW'), findsOneWidget);
+      expect(find.text('Funny and sad at once.'), findsNothing);
+      // Your own spoiler review stays readable, with a clear badge
+      expect(find.bySemanticsLabel('Contains spoilers'), findsOneWidget);
+      expect(
+        find.textContaining('Others see a spoiler warning'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a spoiler review opens hidden until Show review',
+        (tester) async {
+      await pumpDetails(tester, session: _user);
+      await scrollTo(tester, find.textContaining('may contain spoilers'));
+      await tester.tap(find.textContaining('may contain spoilers'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("Lauren's Review"), findsOneWidget);
+      expect(find.text('The ending reveals the mother.'), findsNothing);
+      await tester.tap(find.text('Show review'));
+      await tester.pumpAndSettle();
+      expect(find.text('The ending reveals the mother.'), findsOneWidget);
+    });
+
+    testWidgets('a review page: like it, see and like comments, add one',
+        (tester) async {
+      final server = await pumpDetails(tester, session: _user);
+      await scrollTo(tester, find.text('Funny and sad at once.'));
+      await tester.tap(find.text('Funny and sad at once.'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("Zoe's Review"), findsOneWidget);
+      expect(find.text('Watched Nov 8, 2026'), findsOneWidget);
+      expect(find.text('3 likes'), findsOneWidget);
+      expect(find.text('1 COMMENT'), findsOneWidget);
+      expect(find.text('Potsticker'), findsOneWidget);
+      expect(find.text('10000%.'), findsOneWidget);
+
+      // Like the review
+      await tester.tap(find.bySemanticsLabel('Like review'));
+      await tester.pumpAndSettle();
+      expect(server.reviewLikes, ['PUT 11']);
+      expect(find.text('4 likes'), findsOneWidget);
+      expect(find.text('LIKED'), findsOneWidget);
+
+      // Like the comment
+      await tester.tap(find.byTooltip('Like comment'));
+      await tester.pumpAndSettle();
+      expect(server.commentLikes, ['PUT']);
+      expect(find.text('1 like'), findsOneWidget);
+
+      // Add a comment
+      await tester.tap(find.byTooltip('Add comment'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add Comment'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'So true!');
+      await tester.pump();
+      await tester.tap(find.byTooltip('Post'));
+      await tester.pumpAndSettle();
+
+      expect(server.postedComments, ['So true!']);
+      expect(find.text('Add Comment'), findsNothing);
+      expect(find.text('So true!'), findsOneWidget);
+      expect(find.text('2 COMMENTS'), findsOneWidget);
+    });
+
+    testWidgets('a guest who taps Like is asked to sign in', (tester) async {
+      await pumpDetails(tester);
+      await scrollTo(tester, find.text('Funny and sad at once.'));
+      await tester.tap(find.text('Funny and sad at once.'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.bySemanticsLabel('Like review'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Register or Sign In to your NoiReel account to like and comment.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Add Comment asks before throwing away text', (tester) async {
+      final server = await pumpDetails(tester, session: _user);
+      await scrollTo(tester, find.text('Funny and sad at once.'));
+      await tester.tap(find.text('Funny and sad at once.'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Add comment'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Half a thought');
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Discard changes?'), findsOneWidget);
+      await tester.tap(find.text('Yes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add Comment'), findsNothing);
+      expect(server.postedComments, isEmpty);
     });
   });
 }
